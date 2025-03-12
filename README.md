@@ -1,6 +1,15 @@
 # Angular19
+Base project for Web Applications:
+- [Angular 19](https://github.com/angular/angular-cli)
+  - SSR
+  - Zoneless
+  - OnPush and Standalone components
+  - GlobalService using Signals
+- [Taiga UI](https://taiga-ui.dev/), with mobile first templates
+- [Tailwind 4](https://tailwindcss.com/)
+- ESLINT
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.0.7.
+With love, by Gabri Mejía
 
 ## Development server
 
