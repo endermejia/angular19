@@ -1,5 +1,5 @@
 <header tuiNavigationHeader>
-  <strong>Angular19</strong>
+  <strong>{{ globalService.headerTitle() }}</strong>
   <hr/>
   <tui-textfield>
     <input
@@ -10,7 +10,7 @@
     />
     <ng-template #search>
       <tui-search-results [results]="results$ | async">
-        <tui-search-history [popular]="popular"/>
+        <tui-search-history [popular]="globalService.searchPopular()"/>
         <ng-template let-item>
           <a
             tuiCell
@@ -18,14 +18,14 @@
           >
             <tui-avatar [src]="item.icon || '@tui.file'"/>
             <span tuiTitle>
-                            {{ item.title }}
+              {{ item.title }}
               <span tuiSubtitle>{{ item.subtitle }}</span>
-                        </span>
+            </span>
           </a>
         </ng-template>
       </tui-search-results>
     </ng-template>
   </tui-textfield>
-  Alex Inkin
-  <tui-avatar src="https://avatars.githubusercontent.com/u/11832552"/>
+  {{ globalService.user().name }}
+  <tui-avatar [src]="globalService.user().picture"/>
 </header>

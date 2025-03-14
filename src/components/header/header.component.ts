@@ -1,5 +1,11 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TUI_DEFAULT_MATCHER } from '@taiga-ui/cdk';
 import { TuiTextfield, TuiTitle } from '@taiga-ui/core';
@@ -11,52 +17,7 @@ import {
 import { TuiAvatar } from '@taiga-ui/kit';
 import { TuiCell, TuiInputSearch, TuiNavigation } from '@taiga-ui/layout';
 import { filter, map, startWith, switchMap, timer } from 'rxjs';
-
-interface Result {
-  href: string;
-  title: string;
-  subtitle?: string;
-  icon?: string;
-}
-
-const DATA: Record<string, readonly Result[]> = {
-  Documents: [
-    {
-      title: 'Monty Python',
-      href: 'https://en.wikipedia.org/wiki/Monty_Python',
-    },
-  ],
-  Code: [
-    {
-      title: 'Taiga UI',
-      href: 'https://github.com/taiga-family/taiga-ui',
-      icon: '@tui.github',
-    },
-    {
-      title: 'Maskito',
-      href: 'https://github.com/taiga-family/maskito',
-      icon: '@tui.github',
-    },
-    {
-      title: 'Taiga UI Proprietary',
-      href: 'https://super-secret-evil.org/taiga-ui',
-      icon: '@tui.gitlab',
-    },
-  ],
-  Links: [
-    {
-      title: 'Taiga UI',
-      subtitle: 'Super awesome library',
-      href: 'https://taiga-ui.dev',
-      icon: '/assets/images/taiga.svg',
-    },
-    {
-      title: 'Maskito',
-      href: 'https://maskito.dev',
-      icon: '@tui.external-link',
-    },
-  ],
-};
+import { GlobalServiceService, SearchData } from '../../services';
 
 @Component({
   selector: 'app-header',
@@ -77,8 +38,7 @@ const DATA: Record<string, readonly Result[]> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HeaderComponent {
-  status = 'success';
-  protected readonly popular = ['Taiga UI', 'Maskito', 'Web APIs for Angular'];
+  protected globalService = inject(GlobalServiceService);
 
   protected readonly control = new FormControl('');
 
@@ -92,8 +52,8 @@ export class HeaderComponent {
     ),
   );
 
-  private filter(query: string): Record<string, readonly Result[]> {
-    return Object.entries(DATA).reduce(
+  private filter(query: string): SearchData {
+    return Object.entries(this.globalService.searchData()).reduce(
       (result, [key, value]) => ({
         ...result,
         [key]: value.filter(({ title, href, subtitle = '' }) =>

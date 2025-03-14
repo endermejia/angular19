@@ -7,9 +7,11 @@ import { HeaderComponent } from '../components';
   selector: 'app-root',
   imports: [RouterOutlet, TuiRoot, HeaderComponent],
   template: `
-    <tui-root>
-      <app-header />
-      <router-outlet />
+    <tui-root class="overflow-hidden">
+      <div class="h-[100vh] flex flex-col">
+        <app-header />
+        <router-outlet />
+      </div>
     </tui-root>
   `,
 })
