@@ -3,7 +3,6 @@ import {
   Component,
   ElementRef,
   ViewChild,
-  ViewEncapsulation,
 } from '@angular/core';
 import { TuiBottomSheet } from '@taiga-ui/addon-mobile';
 import { TuiButton, TuiTitle } from '@taiga-ui/core';

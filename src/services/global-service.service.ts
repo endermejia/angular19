@@ -1,18 +1,25 @@
 import { Injectable, signal, WritableSignal } from '@angular/core';
+import { TuiFlagPipe } from '@taiga-ui/core';
 
 interface User {
   name: string;
   picture: string;
 }
 
-interface Result {
+export interface SearchItem {
   href: string;
   title: string;
   subtitle?: string;
   icon?: string;
 }
+export type SearchData = Record<string, readonly SearchItem[]>;
 
-export type SearchData = Record<string, readonly Result[]>;
+export interface OptionsItem {
+  name: string;
+  icon: string;
+  fn?: (item: OptionsItem) => void;
+}
+export type OptionsData = Record<string, readonly OptionsItem[]>;
 
 @Injectable({
   providedIn: 'root',
@@ -22,6 +29,55 @@ export class GlobalServiceService {
   user: WritableSignal<User> = signal({
     name: 'Gabri Mejía',
     picture: 'https://gabriel-mejia.com/assets/profile.webp',
+  });
+
+  drawer: WritableSignal<OptionsData> = signal({
+    Navigation: [
+      {
+        name: 'Map',
+        icon: '@tui.map',
+        fn: (item) => console.log(item.name),
+      },
+      {
+        name: 'Zones',
+        icon: '@tui.mountain',
+        fn: (item) => console.log(item.name),
+      },
+    ],
+    Logbook: [
+      {
+        name: 'Crags',
+        icon: '@tui.signpost',
+        fn: (item) => console.log(item.name),
+      },
+    ],
+  });
+
+  settings: WritableSignal<OptionsData> = signal({
+    Preferences: [
+      {
+        name: 'Language',
+        icon: new TuiFlagPipe().transform('ES'),
+        fn: (item) => console.log(item.name),
+      },
+      {
+        name: 'Theme',
+        icon: '@tui.palette',
+        fn: (item) => console.log(item.name),
+      },
+    ],
+    Account: [
+      {
+        name: 'Profile',
+        icon: '@tui.user-round',
+        fn: (item) => console.log(item.name),
+      },
+      {
+        name: 'Security',
+        icon: '@tui.shield',
+        fn: (item) => console.log(item.name),
+      },
+    ],
   });
 
   searchPopular: WritableSignal<string[]> = signal(['Onil', 'El Tormo']);

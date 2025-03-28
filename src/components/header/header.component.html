@@ -1,31 +1,77 @@
-<header tuiNavigationHeader>
-  <strong>{{ globalService.headerTitle() }}</strong>
-  <hr/>
-  <tui-textfield>
-    <input
-      tuiSearchHotkey
-      [formControl]="control"
-      [tuiInputSearch]="search"
-      ngSkipHydration
-    />
-    <ng-template #search>
-      <tui-search-results [results]="results$ | async">
-        <tui-search-history [popular]="globalService.searchPopular()"/>
-        <ng-template let-item>
-          <a
-            tuiCell
-            [href]="item.href"
-          >
-            <tui-avatar [src]="item.icon || '@tui.file'"/>
-            <span tuiTitle>
-              {{ item.title }}
-              <span tuiSubtitle>{{ item.subtitle }}</span>
-            </span>
-          </a>
-        </ng-template>
-      </tui-search-results>
-    </ng-template>
-  </tui-textfield>
-  {{ globalService.user().name }}
-  <tui-avatar [src]="globalService.user().picture"/>
+<header tuiNavigationHeader class="flex items-center justify-between sm:gap-4">
+  <div class="flex items-center gap-2">
+    <button
+      title="Menu"
+      tuiIconButton
+      tuiNavigationDrawer
+      type="button"
+      [(open)]="open"
+    >
+      <tui-data-list>
+        @for (group of globalService.drawer() | keyvalue; track group.key) {
+          <tui-opt-group [label]="group.key">
+            @for (item of group.value; track item.name) {
+              <button
+                tuiOption
+                type="button"
+                (click)="onClick(item); open = false"
+                class="gap-2"
+              >
+                <tui-avatar [src]="item.icon || '@tui.file'" />
+                {{ item.name }}
+              </button>
+            }
+          </tui-opt-group>
+        }
+      </tui-data-list>
+    </button>
+    <strong class="hidden sm:block">{{ globalService.headerTitle() }}</strong>
+  </div>
+  <div class="flex items-center gap-2 sm:gap-4">
+    <tui-textfield class="!m-0">
+      <input
+        tuiSearchHotkey
+        [formControl]="control"
+        [tuiInputSearch]="search"
+        ngSkipHydration
+      />
+      <ng-template #search>
+        <tui-search-results [results]="results$ | async">
+          <tui-search-history [popular]="globalService.searchPopular()" />
+          <ng-template let-item>
+            <a tuiCell [href]="item.href">
+              <tui-avatar [src]="item.icon || '@tui.file'" />
+              <span tuiTitle>
+                {{ item.title }}
+                <span tuiSubtitle>{{ item.subtitle }}</span>
+              </span>
+            </a>
+          </ng-template>
+        </tui-search-results>
+      </ng-template>
+    </tui-textfield>
+    <button
+      [tuiDropdown]="content"
+      tuiDropdownOpen
+      type="button"
+      class="flex justify-center items-center gap-2"
+    >
+      <span class="hidden sm:block">{{ globalService.user().name }}</span>
+      <tui-avatar [src]="globalService.user().picture" />
+    </button>
+  </div>
 </header>
+<ng-template #content>
+  <tui-data-list role="menu">
+    @for (group of globalService.settings() | keyvalue; track group.key) {
+      <tui-opt-group [label]="group.key">
+        @for (item of group.value; track item.name) {
+          <button tuiOption type="button" (click)="onClick(item)" class="gap-2">
+            <tui-avatar [src]="item.icon || '@tui.file'" />
+            {{ item.name }}
+          </button>
+        }
+      </tui-opt-group>
+    }
+  </tui-data-list>
+</ng-template>

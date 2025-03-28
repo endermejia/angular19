@@ -1,14 +1,16 @@
-import { AsyncPipe } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { AsyncPipe, KeyValuePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { TUI_DEFAULT_MATCHER } from '@taiga-ui/cdk';
-import { TuiTextfield, TuiTitle } from '@taiga-ui/core';
+import {
+  TuiButton,
+  TuiDataListComponent,
+  TuiDropdown,
+  TuiOptGroup,
+  TuiOption,
+  TuiTextfield,
+  TuiTitle,
+} from '@taiga-ui/core';
 import {
   TuiSearchHistory,
   TuiSearchHotkey,
@@ -17,22 +19,28 @@ import {
 import { TuiAvatar } from '@taiga-ui/kit';
 import { TuiCell, TuiInputSearch, TuiNavigation } from '@taiga-ui/layout';
 import { filter, map, startWith, switchMap, timer } from 'rxjs';
-import { GlobalServiceService, SearchData } from '../../services';
+import { GlobalServiceService, OptionsItem, SearchData } from '../../services';
 
 @Component({
   selector: 'app-header',
   imports: [
     AsyncPipe,
+    KeyValuePipe,
     ReactiveFormsModule,
     TuiAvatar,
+    TuiButton,
     TuiCell,
+    TuiDataListComponent,
+    TuiDropdown,
     TuiInputSearch,
     TuiNavigation,
-    TuiTextfield,
-    TuiTitle,
-    TuiSearchResultsComponent,
+    TuiOptGroup,
+    TuiOption,
     TuiSearchHistory,
     TuiSearchHotkey,
+    TuiSearchResultsComponent,
+    TuiTextfield,
+    TuiTitle,
   ],
   templateUrl: './header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,6 +48,7 @@ import { GlobalServiceService, SearchData } from '../../services';
 export class HeaderComponent {
   protected globalService = inject(GlobalServiceService);
 
+  open = false;
   protected readonly control = new FormControl('');
 
   protected readonly results$ = this.control.valueChanges.pipe(
@@ -51,6 +60,10 @@ export class HeaderComponent {
       ),
     ),
   );
+
+  protected onClick(item: OptionsItem) {
+    item?.fn?.(item);
+  }
 
   private filter(query: string): SearchData {
     return Object.entries(this.globalService.searchData()).reduce(
