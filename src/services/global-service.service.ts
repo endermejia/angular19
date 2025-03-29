@@ -56,24 +56,24 @@ export class GlobalServiceService {
   settings: WritableSignal<OptionsData> = signal({
     Preferences: [
       {
-        name: 'Language',
+        name: 'settings.language',
         icon: new TuiFlagPipe().transform('ES'),
         fn: (item) => console.log(item.name),
       },
       {
-        name: 'Theme',
+        name: 'settings.theme',
         icon: '@tui.palette',
         fn: (item) => console.log(item.name),
       },
     ],
     Account: [
       {
-        name: 'Profile',
+        name: 'settings.profile',
         icon: '@tui.user-round',
         fn: (item) => console.log(item.name),
       },
       {
-        name: 'Security',
+        name: 'settings.security',
         icon: '@tui.shield',
         fn: (item) => console.log(item.name),
       },

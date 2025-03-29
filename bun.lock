@@ -16,6 +16,8 @@
         "@angular/router": "^19.0.0",
         "@angular/ssr": "^19.0.7",
         "@ng-web-apis/universal": "^4.11.1",
+        "@ngx-translate/core": "^16.0.4",
+        "@ngx-translate/http-loader": "^16.0.1",
         "@taiga-ui/addon-charts": "^4.27.1",
         "@taiga-ui/addon-commerce": "^4.27.1",
         "@taiga-ui/addon-doc": "^4.27.1",
@@ -518,6 +520,10 @@
     "@ng-web-apis/universal": ["@ng-web-apis/universal@4.11.1", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/core": ">=16.0.0", "@ng-web-apis/common": ">=4.11.1", "@types/node": ">=22.7.5", "rxjs": ">=7.0.0" } }, "sha512-aKlx5r7PaBwxutw21Ukxz6j0ABYIEW969lxIUzy/GQ2pYToUpXlF4nfLjsllKKOYsnKyiY+ckE43kiNtE0QzaQ=="],
 
     "@ngtools/webpack": ["@ngtools/webpack@19.2.1", "", { "peerDependencies": { "@angular/compiler-cli": "^19.0.0 || ^19.2.0-next.0", "typescript": ">=5.5 <5.9", "webpack": "^5.54.0" } }, "sha512-K8b3+eCG+Iz0EXTE/UDuXabr6yOL9NP6sW1CLk9AUdUUnL4AhoQy/vjfaOtxZx1T8qEErAWizJ51dHD25ysXHw=="],
+
+    "@ngx-translate/core": ["@ngx-translate/core@16.0.4", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/common": ">=16", "@angular/core": ">=16" } }, "sha512-s8llTL2SJvROhqttxvEs7Cg+6qSf4kvZPFYO+cTOY1d8DWTjlutRkWAleZcPPoeX927Dm7ALfL07G7oYDJ7z6w=="],
+
+    "@ngx-translate/http-loader": ["@ngx-translate/http-loader@16.0.1", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/common": ">=16", "@angular/core": ">=16" } }, "sha512-xJEOUpvs6Zfc8G4cmQmegFOEpfYSoplTHHoisPNrATXjRBjpaKsBaPOXlZsuFUW2XV00s16gIyI4+9z1XkO5bw=="],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 

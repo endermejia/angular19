@@ -68,7 +68,7 @@
         @for (item of group.value; track item.name) {
           <button tuiOption type="button" (click)="onClick(item)" class="gap-2">
             <tui-avatar [src]="item.icon || '@tui.file'" />
-            {{ item.name }}
+            {{ item.name | translate }}
           </button>
         }
       </tui-opt-group>

@@ -1,6 +1,7 @@
 import { AsyncPipe, KeyValuePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { TUI_DEFAULT_MATCHER } from '@taiga-ui/cdk';
 import {
   TuiButton,
@@ -41,6 +42,7 @@ import { GlobalServiceService, OptionsItem, SearchData } from '../../services';
     TuiSearchResultsComponent,
     TuiTextfield,
     TuiTitle,
+    TranslatePipe,
   ],
   templateUrl: './header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

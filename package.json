@@ -26,6 +26,8 @@
     "@angular/router": "^19.0.0",
     "@angular/ssr": "^19.0.7",
     "@ng-web-apis/universal": "^4.11.1",
+    "@ngx-translate/core": "^16.0.4",
+    "@ngx-translate/http-loader": "^16.0.1",
     "@taiga-ui/addon-charts": "^4.27.1",
     "@taiga-ui/addon-commerce": "^4.27.1",
     "@taiga-ui/addon-doc": "^4.27.1",
