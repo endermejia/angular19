@@ -1,5 +1,13 @@
-import { Injectable, signal, WritableSignal } from '@angular/core';
+import {
+  computed,
+  inject,
+  Injectable,
+  Signal,
+  signal,
+  WritableSignal,
+} from '@angular/core';
 import { TuiFlagPipe } from '@taiga-ui/core';
+import { TranslateService } from '@ngx-translate/core';
 
 interface User {
   name: string;
@@ -25,11 +33,17 @@ export type OptionsData = Record<string, readonly OptionsItem[]>;
   providedIn: 'root',
 })
 export class GlobalServiceService {
+  private translate = inject(TranslateService);
+  protected readonly flagPipe = new TuiFlagPipe();
+
   headerTitle: WritableSignal<string> = signal('Angular19');
   user: WritableSignal<User> = signal({
     name: 'Gabri Mejía',
     picture: 'https://gabriel-mejia.com/assets/profile.webp',
   });
+
+  selectedLanguage: WritableSignal<string> = signal('es');
+  selectedTheme: WritableSignal<'light' | 'dark'> = signal('light');
 
   drawer: WritableSignal<OptionsData> = signal({
     Navigation: [
@@ -53,20 +67,22 @@ export class GlobalServiceService {
     ],
   });
 
-  settings: WritableSignal<OptionsData> = signal({
-    Preferences: [
+  settings: Signal<OptionsData> = computed(() => ({
+    preferences: [
       {
         name: 'settings.language',
-        icon: new TuiFlagPipe().transform('ES'),
-        fn: (item) => console.log(item.name),
+        icon: this.flagPipe.transform(
+          this.selectedLanguage() === 'es' ? 'es' : 'gb',
+        ),
+        fn: () => this.switchLanguage(),
       },
       {
         name: 'settings.theme',
-        icon: '@tui.palette',
-        fn: (item) => console.log(item.name),
+        icon: `@tui.${this.selectedTheme() === 'dark' ? 'sun' : 'moon'}`,
+        fn: () => this.switchTheme(),
       },
     ],
-    Account: [
+    account: [
       {
         name: 'settings.profile',
         icon: '@tui.user-round',
@@ -78,7 +94,7 @@ export class GlobalServiceService {
         fn: (item) => console.log(item.name),
       },
     ],
-  });
+  }));
 
   searchPopular: WritableSignal<string[]> = signal(['Onil', 'El Tormo']);
   searchData: WritableSignal<SearchData> = signal({
@@ -104,4 +120,15 @@ export class GlobalServiceService {
       },
     ],
   });
+
+  private switchLanguage(): void {
+    this.selectedLanguage.set(this.selectedLanguage() === 'es' ? 'en' : 'es');
+    this.translate.use(this.selectedLanguage());
+    // localStorage.setItem('language', this.selectedLanguage());
+  }
+
+  private switchTheme(): void {
+    this.selectedTheme.set(this.selectedTheme() === 'dark' ? 'light' : 'dark');
+    // localStorage.setItem('theme', this.selectedTheme());
+  }
 }

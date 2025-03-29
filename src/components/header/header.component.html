@@ -64,7 +64,7 @@
 <ng-template #content>
   <tui-data-list role="menu">
     @for (group of globalService.settings() | keyvalue; track group.key) {
-      <tui-opt-group [label]="group.key">
+      <tui-opt-group [label]="group.key | translate">
         @for (item of group.value; track item.name) {
           <button tuiOption type="button" (click)="onClick(item)" class="gap-2">
             <tui-avatar [src]="item.icon || '@tui.file'" />
