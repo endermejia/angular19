@@ -1,0 +1,4 @@
+[[redirects]]
+from = "/i18n/*"
+to = "/dist/angular19/browser/i18n/:splat"
+status = 200
