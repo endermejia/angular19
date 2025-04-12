@@ -1,6 +1,14 @@
 {
+  "account": "Account",
+  "preferences": "Preferences",
   "settings.profile": "Profile",
   "settings.security": "Security",
   "settings.language": "Language",
-  "settings.theme": "Theme"
+  "settings.theme": "Theme",
+  "Navigation": "Navigation",
+  "Logbook": "Logbook",
+  "Map": "Map",
+  "Zones": "Zones",
+  "Crags": "Crags",
+  "Menu": "Menu"
 }

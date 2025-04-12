@@ -7,6 +7,11 @@ export const routes: Routes = [
       import('../components/home/home.component').then((m) => m.HomeComponent),
   },
   {
+    path: 'profile',
+    loadComponent: () =>
+      import('../components/profile/profile.component').then((m) => m.ProfileComponent),
+  },
+  {
     path: '',
     redirectTo: 'home',
     pathMatch: 'full',

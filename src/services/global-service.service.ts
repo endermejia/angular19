@@ -6,6 +6,7 @@ import {
   signal,
   WritableSignal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { TuiFlagPipe } from '@taiga-ui/core';
 import { TranslateService } from '@ngx-translate/core';
 
@@ -34,6 +35,7 @@ export type OptionsData = Record<string, readonly OptionsItem[]>;
 })
 export class GlobalServiceService {
   private translate = inject(TranslateService);
+  private router = inject(Router);
   protected readonly flagPipe = new TuiFlagPipe();
 
   headerTitle: WritableSignal<string> = signal('Angular19');
@@ -50,19 +52,19 @@ export class GlobalServiceService {
       {
         name: 'Map',
         icon: '@tui.map',
-        fn: (item) => console.log(item.name),
+        fn: (item: OptionsItem) => console.log(item.name),
       },
       {
         name: 'Zones',
         icon: '@tui.mountain',
-        fn: (item) => console.log(item.name),
+        fn: (item: OptionsItem) => console.log(item.name),
       },
     ],
     Logbook: [
       {
         name: 'Crags',
         icon: '@tui.signpost',
-        fn: (item) => console.log(item.name),
+        fn: (item: OptionsItem) => console.log(item.name),
       },
     ],
   });
@@ -86,12 +88,14 @@ export class GlobalServiceService {
       {
         name: 'settings.profile',
         icon: '@tui.user-round',
-        fn: (item) => console.log(item.name),
+        fn: () => {
+          this.router.navigate(['/profile']);
+        },
       },
       {
         name: 'settings.security',
         icon: '@tui.shield',
-        fn: (item) => console.log(item.name),
+        fn: (item: OptionsItem) => console.log(item.name),
       },
     ],
   }));

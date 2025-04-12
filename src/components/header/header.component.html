@@ -1,7 +1,7 @@
 <header tuiNavigationHeader class="flex items-center justify-between sm:gap-4">
   <div class="flex items-center gap-2">
     <button
-      title="Menu"
+      title="{{ 'Menu' | translate }}"
       tuiIconButton
       tuiNavigationDrawer
       type="button"
@@ -9,7 +9,7 @@
     >
       <tui-data-list>
         @for (group of globalService.drawer() | keyvalue; track group.key) {
-          <tui-opt-group [label]="group.key">
+          <tui-opt-group [label]="group.key | translate">
             @for (item of group.value; track item.name) {
               <button
                 tuiOption
@@ -18,7 +18,7 @@
                 class="gap-2"
               >
                 <tui-avatar [src]="item.icon || '@tui.file'" />
-                {{ item.name }}
+                {{ item.name | translate }}
               </button>
             }
           </tui-opt-group>

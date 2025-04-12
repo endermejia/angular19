@@ -1,0 +1,9 @@
+<div class="flex flex-col gap-4 p-4">
+  <h3>{{ 'settings.profile' | translate }}</h3>
+  <div class="flex items-center gap-4 my-4">
+    <tui-avatar [src]="globalService.user().picture" size="xl"></tui-avatar>
+    <div>
+      <p><strong>{{ globalService.user().name }}</strong></p>
+    </div>
+  </div>
+</div>
