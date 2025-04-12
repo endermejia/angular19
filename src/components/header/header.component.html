@@ -25,7 +25,9 @@
         }
       </tui-data-list>
     </button>
-    <strong class="hidden sm:block">{{ globalService.headerTitle() }}</strong>
+    <strong class="hidden sm:block">{{
+      globalService.headerTitle() | translate
+    }}</strong>
   </div>
   <div class="flex items-center gap-2 sm:gap-4">
     <tui-textfield class="!m-0">
