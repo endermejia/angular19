@@ -8,10 +8,10 @@ import {
   TuiDataListComponent,
   TuiDropdown,
   TuiOptGroup,
-  TuiOption,
   TuiTextfield,
   TuiTitle,
 } from '@taiga-ui/core';
+import { TuiOption } from '@taiga-ui/core/components/data-list';
 import {
   TuiSearchHistory,
   TuiSearchHotkey,
