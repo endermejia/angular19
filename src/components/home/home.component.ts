@@ -61,11 +61,20 @@ export class HomeComponent implements OnInit, AfterViewInit {
     // Only initialize the map in the browser environment
     if (isPlatformBrowser(this.platformId)) {
       // Dynamically import Leaflet only in browser
-      import('leaflet').then((L) => {
-        // Store Leaflet instance for use in other methods
-        this.L = L;
-        this.fixLeafletIconPaths();
-      });
+      import('leaflet')
+        .then((L) => {
+          // Store Leaflet instance for use in other methods
+          this.L = L;
+          this.fixLeafletIconPaths();
+        })
+        .catch((error) => {
+          console.error('Error loading Leaflet library:', error);
+          // Show a user-friendly error message
+          this.locationDescription.set(
+            this.translate.instant('location.error.map_load_failed') ||
+            'Failed to load map. Please refresh the page and try again.'
+          );
+        });
     }
   }
 
@@ -89,10 +98,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
   private fixLeafletIconPaths(): void {
     if (!this.L) return;
 
-    // Fix Leaflet's default icon paths
-    const iconRetinaUrl = 'assets/marker-icon-2x.png';
-    const iconUrl = 'assets/marker-icon.png';
-    const shadowUrl = 'assets/marker-shadow.png';
+    // Fix Leaflet's default icon paths using CDN URLs
+    const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
+    const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+    const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
 
     // @ts-ignore - Leaflet's typings don't include this property
     delete this.L.Icon.Default.prototype._getIconUrl;
@@ -144,16 +153,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
           )
           .openOn(this.map);
 
-        // Add event listener to the retry button
-        setTimeout(() => {
-          const retryButton = document.getElementById('retry-location');
-          if (retryButton) {
-            retryButton.addEventListener('click', () => {
-              locationMessage.close();
-              this.requestGeolocation();
-            });
-          }
-        }, 100);
+        // Add event listener to the retry button using MutationObserver
+        this.addEventListenerToPopupButton('retry-location', () => {
+          locationMessage.close();
+          this.requestGeolocation();
+        });
       }
 
       this.requestGeolocation();
@@ -182,14 +186,14 @@ export class HomeComponent implements OnInit, AfterViewInit {
           this.map.setView([latitude, longitude], 13);
 
           // Update the bottom-sheet with user location info
-          this.locationName.set('Your Location');
-          this.locationRegion.set('Current Position');
+          this.locationName.set(this.translate.instant('location.your_location'));
+          this.locationRegion.set(this.translate.instant('location.current_position'));
           this.locationDetails.set([
-            { label: 'Latitude', value: latitude.toFixed(6) },
-            { label: 'Longitude', value: longitude.toFixed(6) },
+            { label: this.translate.instant('location.details.latitude'), value: latitude.toFixed(6) },
+            { label: this.translate.instant('location.details.longitude'), value: longitude.toFixed(6) },
           ]);
           this.locationDescription.set(
-            'This is your current location. Click on markers to see information about other locations.',
+            this.translate.instant('location.current_location_description'),
           );
 
           // Update map URL to point to the user's location
@@ -201,19 +205,19 @@ export class HomeComponent implements OnInit, AfterViewInit {
           // Add a marker at the user's location
           const userMarker = this.L.marker([latitude, longitude])
             .addTo(this.map)
-            .bindPopup('Your current location')
+            .bindPopup(this.translate.instant('location.your_current_location'))
             .openPopup();
 
           // Add click handler to user marker
           userMarker.on('click', () => {
             this.updateLocationInfo(
-              'Your Location',
-              'Current Position',
+              this.translate.instant('location.your_location'),
+              this.translate.instant('location.current_position'),
               [
-                { label: 'Latitude', value: latitude.toFixed(6) },
-                { label: 'Longitude', value: longitude.toFixed(6) },
+                { label: this.translate.instant('location.details.latitude'), value: latitude.toFixed(6) },
+                { label: this.translate.instant('location.details.longitude'), value: longitude.toFixed(6) },
               ],
-              'This is your current location. Click on markers to see information about other locations.',
+              this.translate.instant('location.current_location_description'),
             );
           });
 
@@ -353,8 +357,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
     this.locationDescription.set(description);
 
     // Update map URL to point to the location
-    const latValue = details.find((d) => d.label === 'Latitude')?.value;
-    const lngValue = details.find((d) => d.label === 'Longitude')?.value;
+    const latLabel = this.translate.instant('location.details.latitude');
+    const lngLabel = this.translate.instant('location.details.longitude');
+    const latValue = details.find((d) => d.label === latLabel)?.value;
+    const lngValue = details.find((d) => d.label === lngLabel)?.value;
     if (latValue && lngValue) {
       this.mapUrl.set(
         `https://www.openstreetmap.org/#map=15/${latValue}/${lngValue}`,
@@ -362,22 +368,30 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
 
     // Update website URL based on location type
+    const typeLabel = this.translate.instant('location.details.type');
     const locationType =
-      details.find((d) => d.label === 'Type')?.value.toLowerCase() || '';
+      details.find((d) => d.label === typeLabel)?.value.toLowerCase() || '';
+
+    const parkType = this.translate.instant('location.type.park').toLowerCase();
+    const cafeType = this.translate.instant('location.type.cafe').toLowerCase();
+    const museumType = this.translate.instant('location.type.museum').toLowerCase();
+    const libraryType = this.translate.instant('location.type.library').toLowerCase();
+    const marketType = this.translate.instant('location.type.market').toLowerCase();
+
     switch (locationType) {
-      case 'park':
+      case parkType:
         this.websiteUrl.set('https://www.nationaltrust.org.uk/visit/parks');
         break;
-      case 'cafe':
+      case cafeType:
         this.websiteUrl.set('https://www.tripadvisor.com/Restaurants');
         break;
-      case 'museum':
+      case museumType:
         this.websiteUrl.set('https://www.museumsassociation.org');
         break;
-      case 'library':
+      case libraryType:
         this.websiteUrl.set('https://www.gov.uk/local-library-services');
         break;
-      case 'market':
+      case marketType:
         this.websiteUrl.set(
           'https://www.visitbritainshop.com/world/articles/best-markets-in-britain/',
         );
@@ -405,11 +419,46 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
     // Location names and types for random markers
     const locationTypes = [
-      { name: 'Park', details: ['Green space', 'Recreation', 'Nature'] },
-      { name: 'Cafe', details: ['Coffee', 'Food', 'Meeting place'] },
-      { name: 'Museum', details: ['Art', 'History', 'Culture'] },
-      { name: 'Library', details: ['Books', 'Study', 'Community'] },
-      { name: 'Market', details: ['Shopping', 'Local produce', 'Crafts'] },
+      {
+        name: this.translate.instant('location.type.park'),
+        details: [
+          this.translate.instant('location.feature.park.1'),
+          this.translate.instant('location.feature.park.2'),
+          this.translate.instant('location.feature.park.3')
+        ]
+      },
+      {
+        name: this.translate.instant('location.type.cafe'),
+        details: [
+          this.translate.instant('location.feature.cafe.1'),
+          this.translate.instant('location.feature.cafe.2'),
+          this.translate.instant('location.feature.cafe.3')
+        ]
+      },
+      {
+        name: this.translate.instant('location.type.museum'),
+        details: [
+          this.translate.instant('location.feature.museum.1'),
+          this.translate.instant('location.feature.museum.2'),
+          this.translate.instant('location.feature.museum.3')
+        ]
+      },
+      {
+        name: this.translate.instant('location.type.library'),
+        details: [
+          this.translate.instant('location.feature.library.1'),
+          this.translate.instant('location.feature.library.2'),
+          this.translate.instant('location.feature.library.3')
+        ]
+      },
+      {
+        name: this.translate.instant('location.type.market'),
+        details: [
+          this.translate.instant('location.feature.market.1'),
+          this.translate.instant('location.feature.market.2'),
+          this.translate.instant('location.feature.market.3')
+        ]
+      },
     ];
 
     for (let i = 0; i < 5; i++) {
@@ -426,14 +475,18 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
       // Create marker details
       const details = [
-        { label: 'Type', value: locationType.name },
-        { label: 'Latitude', value: markerLat.toFixed(6) },
-        { label: 'Longitude', value: markerLng.toFixed(6) },
-        { label: 'Features', value: locationType.details.join(', ') },
+        { label: this.translate.instant('location.details.type'), value: locationType.name },
+        { label: this.translate.instant('location.details.latitude'), value: markerLat.toFixed(6) },
+        { label: this.translate.instant('location.details.longitude'), value: markerLng.toFixed(6) },
+        { label: this.translate.instant('location.details.features'), value: locationType.details.join(', ') },
       ];
 
       // Create description
-      const description = `This is a local ${locationType.name.toLowerCase()} near your location. It's approximately ${(Math.random() * 2).toFixed(1)} km from your current position. ${locationType.name}s are great places to ${locationType.details[0].toLowerCase()}.`;
+      const distance = (Math.random() * 2).toFixed(1);
+      const description = this.translate.instant(
+        'location.description',
+        [locationType.name.toLowerCase(), distance, locationType.name, locationType.details[0].toLowerCase()]
+      );
 
       const marker = this.L.marker([markerLat, markerLng])
         .addTo(this.map)
@@ -443,7 +496,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
       marker.on('click', () => {
         this.updateLocationInfo(
           markerName,
-          'Near your location',
+          this.translate.instant('location.near_your_location'),
           details,
           description,
         );
@@ -460,8 +513,6 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
     if (this.button?.nativeElement) {
       this.button.nativeElement.style.setProperty('transform', transform);
-      // Ensure the z-index is preserved
-      this.button.nativeElement.style.setProperty('z-index', '10000');
     }
   }
 }

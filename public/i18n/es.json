@@ -25,5 +25,40 @@
   "location.error.unknown.message": "Ha ocurrido un error desconocido al intentar obtener tu ubicación. Por favor, inténtalo de nuevo más tarde.",
   "location.error.unsupported.title": "Tu navegador no soporta geolocalización",
   "location.error.unsupported.message": "Esta aplicación necesita acceso a tu ubicación para funcionar correctamente. Por favor, utiliza un navegador moderno que soporte geolocalización.",
-  "location.retry": "Reintentar"
+  "location.retry": "Reintentar",
+
+  "location.your_location": "Tu ubicación",
+  "location.current_position": "Posición actual",
+  "location.near_your_location": "Cerca de tu ubicación",
+  "location.your_current_location": "Tu ubicación actual",
+  "location.current_location_description": "Esta es tu ubicación actual. Haz clic en los marcadores para ver información sobre otros lugares.",
+
+  "location.details.type": "Tipo",
+  "location.details.latitude": "Latitud",
+  "location.details.longitude": "Longitud",
+  "location.details.features": "Características",
+
+  "location.type.park": "Parque",
+  "location.type.cafe": "Café",
+  "location.type.museum": "Museo",
+  "location.type.library": "Biblioteca",
+  "location.type.market": "Mercado",
+
+  "location.feature.park.1": "Espacio verde",
+  "location.feature.park.2": "Recreación",
+  "location.feature.park.3": "Naturaleza",
+  "location.feature.cafe.1": "Café",
+  "location.feature.cafe.2": "Comida",
+  "location.feature.cafe.3": "Lugar de encuentro",
+  "location.feature.museum.1": "Arte",
+  "location.feature.museum.2": "Historia",
+  "location.feature.museum.3": "Cultura",
+  "location.feature.library.1": "Libros",
+  "location.feature.library.2": "Estudio",
+  "location.feature.library.3": "Comunidad",
+  "location.feature.market.1": "Compras",
+  "location.feature.market.2": "Productos locales",
+  "location.feature.market.3": "Artesanías",
+
+  "location.description": "Este es un {0} local cerca de tu ubicación. Está aproximadamente a {1} km de tu posición actual. Los {2}s son excelentes lugares para {3}."
 }

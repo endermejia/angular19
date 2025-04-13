@@ -25,5 +25,40 @@
   "location.error.unknown.message": "An unknown error occurred while trying to get your location. Please try again later.",
   "location.error.unsupported.title": "Your browser does not support geolocation",
   "location.error.unsupported.message": "This application needs access to your location to function properly. Please use a modern browser that supports geolocation.",
-  "location.retry": "Retry"
+  "location.retry": "Retry",
+
+  "location.your_location": "Your Location",
+  "location.current_position": "Current Position",
+  "location.near_your_location": "Near your location",
+  "location.your_current_location": "Your current location",
+  "location.current_location_description": "This is your current location. Click on markers to see information about other locations.",
+
+  "location.details.type": "Type",
+  "location.details.latitude": "Latitude",
+  "location.details.longitude": "Longitude",
+  "location.details.features": "Features",
+
+  "location.type.park": "Park",
+  "location.type.cafe": "Cafe",
+  "location.type.museum": "Museum",
+  "location.type.library": "Library",
+  "location.type.market": "Market",
+
+  "location.feature.park.1": "Green space",
+  "location.feature.park.2": "Recreation",
+  "location.feature.park.3": "Nature",
+  "location.feature.cafe.1": "Coffee",
+  "location.feature.cafe.2": "Food",
+  "location.feature.cafe.3": "Meeting place",
+  "location.feature.museum.1": "Art",
+  "location.feature.museum.2": "History",
+  "location.feature.museum.3": "Culture",
+  "location.feature.library.1": "Books",
+  "location.feature.library.2": "Study",
+  "location.feature.library.3": "Community",
+  "location.feature.market.1": "Shopping",
+  "location.feature.market.2": "Local produce",
+  "location.feature.market.3": "Crafts",
+
+  "location.description": "This is a local {0} near your location. It's approximately {1} km from your current position. {2}s are great places to {3}."
 }

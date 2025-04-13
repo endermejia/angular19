@@ -1,9 +1,13 @@
 <div class="flex flex-col gap-4 h-full w-full relative">
-  <div id="map" class="w-full h-full" style="z-index: 1;"></div>
+  <div
+    id="map"
+    class="w-full h-full"
+    aria-label="Interactive map"
+    role="application"
+  ></div>
   <div
     #buttons
-    class="absolute bottom-32 w-full max-w-[40rem] flex gap-4 px-4 md:px-0 items-center justify-end place-self-center"
-    style="z-index: 10000;"
+    class="absolute bottom-32 w-full max-w-[40rem] flex gap-4 px-4 md:px-0 items-center justify-end place-self-center z-50"
   >
     <a
       appearance="floating"
@@ -13,6 +17,7 @@
       size="m"
       target="_blank"
       tuiIconButton
+      aria-label="Open location in OpenStreetMap"
     >
       Map
     </a>
@@ -25,6 +30,7 @@
         size="m"
         target="_blank"
         tuiIconButton
+        aria-label="Visit related website for this location"
       >
         Website
       </a>
@@ -33,9 +39,10 @@
   <tui-bottom-sheet
     [stops]="stops"
     (scroll.zoneless)="onScroll($any($event.target))"
-    style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 9999;"
+    role="dialog"
+    aria-labelledby="location-info-title"
   >
-    <h3 tuiHeader>
+    <h3 tuiHeader id="location-info-title">
       <span tuiTitle>
         {{ locationName() }}
         @if (locationRegion()) {
