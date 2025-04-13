@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+/* Custom styles to ensure bottom sheet appears above map */
+tui-bottom-sheet {
+  position: relative;
+  z-index: 9999 !important;
+}
+
+.leaflet-container {
+  z-index: 1;
+}
