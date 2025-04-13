@@ -12,7 +12,7 @@ import { GlobalServiceService, LocalStorageService } from '../services';
       class="overflow-hidden"
       [attr.tuiTheme]="globalService.selectedTheme()"
     >
-      <div class="h-[100vh] flex flex-col">
+      <div class="h-[100dvh] flex flex-col">
         <app-header />
         <router-outlet />
       </div>
