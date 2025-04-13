@@ -60,12 +60,20 @@ export class HomeComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     // Only initialize the map in the browser environment
     if (isPlatformBrowser(this.platformId)) {
+      // Ensure Leaflet CSS is loaded
+      this.ensureLeafletCssLoaded();
+
       // Dynamically import Leaflet only in browser
       import('leaflet')
         .then((L) => {
           // Store Leaflet instance for use in other methods
           this.L = L;
-          this.fixLeafletIconPaths();
+          console.log('Leaflet library loaded successfully');
+
+          // Small delay to ensure the library is fully initialized
+          setTimeout(() => {
+            this.fixLeafletIconPaths();
+          }, 100);
         })
         .catch((error) => {
           console.error('Error loading Leaflet library:', error);
@@ -78,57 +86,118 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
   }
 
+  private ensureLeafletCssLoaded(): void {
+    // Check if Leaflet CSS is already loaded
+    const existingLink = document.querySelector('link[href*="leaflet.css"]');
+    if (!existingLink) {
+      console.log('Dynamically loading Leaflet CSS');
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    } else {
+      console.log('Leaflet CSS already loaded');
+    }
+  }
+
   ngAfterViewInit(): void {
     // Initialize the map after the view is initialized
-    if (isPlatformBrowser(this.platformId) && this.L) {
-      this.initMap();
-    } else if (isPlatformBrowser(this.platformId)) {
-      // If Leaflet is not loaded yet, wait for it
-      const checkLeaflet = () => {
-        if (this.L) {
-          this.initMap();
-        } else {
-          requestAnimationFrame(checkLeaflet);
-        }
-      };
-      requestAnimationFrame(checkLeaflet);
+    if (isPlatformBrowser(this.platformId)) {
+      if (this.L && this.L.Icon && this.L.Icon.Default) {
+        // Leaflet is fully loaded with Icon support
+        this.initMap();
+      } else {
+        // If Leaflet is not loaded yet or not fully initialized, wait for it
+        let attempts = 0;
+        const maxAttempts = 20; // Limit the number of attempts to prevent infinite loops
+
+        const checkLeaflet = () => {
+          attempts++;
+          if (this.L && this.L.Icon && this.L.Icon.Default) {
+            console.log('Leaflet fully loaded after', attempts, 'attempts');
+            this.initMap();
+          } else if (attempts < maxAttempts) {
+            console.log('Waiting for Leaflet to load, attempt', attempts);
+            setTimeout(checkLeaflet, 100); // Use setTimeout instead of requestAnimationFrame for more reliable timing
+          } else {
+            console.error('Failed to load Leaflet after', maxAttempts, 'attempts');
+          }
+        };
+
+        setTimeout(checkLeaflet, 100);
+      }
     }
   }
 
   private fixLeafletIconPaths(): void {
     if (!this.L) return;
 
+    // Make sure L.Icon and L.Icon.Default exist before proceeding
+    if (!this.L.Icon || !this.L.Icon.Default) {
+      console.error('Leaflet Icon or Icon.Default is undefined');
+      return;
+    }
+
     // Fix Leaflet's default icon paths using CDN URLs
     const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
     const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
     const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
 
-    // @ts-ignore - Leaflet's typings don't include this property
-    delete this.L.Icon.Default.prototype._getIconUrl;
+    try {
+      // @ts-ignore - Leaflet's typings don't include this property
+      delete this.L.Icon.Default.prototype._getIconUrl;
 
-    this.L.Icon.Default.mergeOptions({
-      iconRetinaUrl,
-      iconUrl,
-      shadowUrl,
-    });
+      this.L.Icon.Default.mergeOptions({
+        iconRetinaUrl,
+        iconUrl,
+        shadowUrl,
+      });
+    } catch (error) {
+      console.error('Error configuring Leaflet icons:', error);
+    }
   }
 
   private initMap(): void {
-    if (!this.L) return;
+    if (!this.L) {
+      console.error('Cannot initialize map: Leaflet library not loaded');
+      return;
+    }
 
-    // Create the map instance with a temporary default view
-    // We'll update it with the user's location as soon as it's available
-    this.map = this.L.map('map').setView([0, 0], 2); // World view initially
+    if (!this.L.Icon || !this.L.Icon.Default) {
+      console.error('Cannot initialize map: Leaflet Icon not initialized');
+      return;
+    }
 
-    // Add the OpenStreetMap tiles
-    this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(this.map);
+    try {
+      // Make sure the map container exists
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) {
+        console.error('Map container element not found');
+        return;
+      }
 
-    // Try to get user's current location first
-    // The addRandomMarkers will be called after we get the user's location
-    this.getUserLocation();
+      // Create the map instance with a temporary default view
+      // We'll update it with the user's location as soon as it's available
+      this.map = this.L.map('map').setView([0, 0], 2); // World view initially
+
+      console.log('Map instance created successfully');
+
+      // Add the OpenStreetMap tiles
+      this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(this.map);
+
+      console.log('Map tiles added successfully');
+
+      // Try to get user's current location first
+      // The addRandomMarkers will be called after we get the user's location
+      this.getUserLocation();
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
   }
 
   private getUserLocation(): void {
