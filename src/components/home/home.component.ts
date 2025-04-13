@@ -59,11 +59,11 @@ export class HomeComponent implements OnInit {
       import('leaflet').then((L) => {
         // Store Leaflet instance for use in other methods
         this.L = L;
-        // Use setTimeout to ensure the DOM is ready
+        // Use setTimeout to ensure the DOM is fully ready
         setTimeout(() => {
           this.fixLeafletIconPaths();
           this.initMap();
-        });
+        }, 300);
       });
     }
   }
@@ -77,18 +77,50 @@ export class HomeComponent implements OnInit {
     const iconUrl = baseUrl + 'assets/marker-icon.png';
     const shadowUrl = baseUrl + 'assets/marker-shadow.png';
 
-    // @ts-ignore - Leaflet's typings don't include this property
-    delete this.L.Icon.Default.prototype._getIconUrl;
+    // Check if Icon and Icon.Default exist before trying to use them
+    if (this.L.Icon && this.L.Icon.Default) {
+      // @ts-ignore - Leaflet's typings don't include this property
+      delete this.L.Icon.Default.prototype._getIconUrl;
 
-    this.L.Icon.Default.mergeOptions({
-      iconRetinaUrl,
-      iconUrl,
-      shadowUrl,
-    });
+      this.L.Icon.Default.mergeOptions({
+        iconRetinaUrl,
+        iconUrl,
+        shadowUrl,
+      });
+    } else {
+      console.warn('Leaflet Icon or Icon.Default is undefined. Using alternative approach.');
+
+      // If Icon.Default is not available, we can create a custom icon
+      if (this.L.icon) {
+        const defaultIcon = this.L.icon({
+          iconRetinaUrl,
+          iconUrl,
+          shadowUrl,
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+
+        // Store it for later use
+        (this.L as any).defaultIcon = defaultIcon;
+      } else {
+        console.error('Leaflet icon functionality is not available');
+      }
+    }
   }
 
   private initMap(): void {
     if (!this.L) return;
+
+    // Check if the map container exists
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+      console.error('Map container not found');
+      // Try again after a short delay
+      setTimeout(() => this.initMap(), 500);
+      return;
+    }
 
     // Create the map instance with a temporary default view
     // We'll update it with the user's location as soon as it's available
@@ -99,6 +131,13 @@ export class HomeComponent implements OnInit {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors',
     }).addTo(this.map);
+
+    // Force a map resize after initialization to ensure proper rendering
+    setTimeout(() => {
+      if (this.map) {
+        this.map.invalidateSize();
+      }
+    }, 100);
 
     // Try to get user's current location first
     // The addRandomMarkers will be called after we get the user's location
