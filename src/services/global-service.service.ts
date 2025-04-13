@@ -9,6 +9,7 @@ import {
 import { Router } from '@angular/router';
 import { TuiFlagPipe } from '@taiga-ui/core';
 import { TranslateService } from '@ngx-translate/core';
+import { LocalStorageService } from './local-storage.service';
 
 interface User {
   name: string;
@@ -36,6 +37,7 @@ export type OptionsData = Record<string, readonly OptionsItem[]>;
 export class GlobalServiceService {
   private translate = inject(TranslateService);
   private router = inject(Router);
+  private localStorage = inject(LocalStorageService);
   protected readonly flagPipe = new TuiFlagPipe();
 
   headerTitle: WritableSignal<string> = signal('Angular19');
@@ -128,11 +130,11 @@ export class GlobalServiceService {
   private switchLanguage(): void {
     this.selectedLanguage.set(this.selectedLanguage() === 'es' ? 'en' : 'es');
     this.translate.use(this.selectedLanguage());
-    // localStorage.setItem('language', this.selectedLanguage());
+    this.localStorage.setItem('language', this.selectedLanguage());
   }
 
   private switchTheme(): void {
     this.selectedTheme.set(this.selectedTheme() === 'dark' ? 'light' : 'dark');
-    // localStorage.setItem('theme', this.selectedTheme());
+    this.localStorage.setItem('theme', this.selectedTheme());
   }
 }

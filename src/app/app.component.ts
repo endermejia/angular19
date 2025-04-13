@@ -2,7 +2,7 @@ import { TuiRoot } from '@taiga-ui/core';
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from '../components';
-import { GlobalServiceService } from '../services';
+import { GlobalServiceService, LocalStorageService } from '../services';
 
 @Component({
   selector: 'app-root',
@@ -21,15 +21,16 @@ import { GlobalServiceService } from '../services';
 })
 export class AppComponent {
   protected globalService = inject(GlobalServiceService);
-  // TODO: localStorage service for SSR
-  // constructor() {
-  //   const localStorageLang = localStorage.getItem('language');
-  //   if (localStorageLang) {
-  //     this.globalService.selectedLanguage.set(localStorageLang);
-  //   }
-  //   const localStorageTheme = localStorage.getItem('theme');
-  //   if (localStorageTheme === 'dark' || localStorageTheme === 'light') {
-  //     this.globalService.selectedTheme.set(localStorageTheme);
-  //   }
-  // }
+  private localStorage = inject(LocalStorageService);
+
+  constructor() {
+    const localStorageLang = this.localStorage.getItem('language');
+    if (localStorageLang) {
+      this.globalService.selectedLanguage.set(localStorageLang);
+    }
+    const localStorageTheme = this.localStorage.getItem('theme');
+    if (localStorageTheme === 'dark' || localStorageTheme === 'light') {
+      this.globalService.selectedTheme.set(localStorageTheme as 'dark' | 'light');
+    }
+  }
 }
