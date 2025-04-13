@@ -10,5 +10,20 @@
   "Map": "Mapa",
   "Zones": "Zonas",
   "Crags": "Sectores",
-  "Menu": "Menú"
+  "Menu": "Menú",
+  "location.permission.title": "Permiso de ubicación",
+  "location.permission.message": "Esta aplicación necesita acceder a tu ubicación para mostrarte lugares cercanos.",
+  "location.permission.allow": "Por favor, permite el acceso cuando el navegador lo solicite.",
+  "location.permission.button": "Permitir acceso",
+  "location.error.denied.title": "Permiso de ubicación denegado",
+  "location.error.denied.message": "Has denegado el permiso para acceder a tu ubicación. Para utilizar todas las funciones de esta aplicación, por favor permite el acceso a tu ubicación.",
+  "location.error.unavailable.title": "Ubicación no disponible",
+  "location.error.unavailable.message": "La información de tu ubicación no está disponible en este momento. Por favor, inténtalo de nuevo más tarde.",
+  "location.error.timeout.title": "Tiempo de espera agotado",
+  "location.error.timeout.message": "La solicitud para obtener tu ubicación ha tardado demasiado tiempo. Por favor, inténtalo de nuevo.",
+  "location.error.unknown.title": "Error desconocido",
+  "location.error.unknown.message": "Ha ocurrido un error desconocido al intentar obtener tu ubicación. Por favor, inténtalo de nuevo más tarde.",
+  "location.error.unsupported.title": "Tu navegador no soporta geolocalización",
+  "location.error.unsupported.message": "Esta aplicación necesita acceso a tu ubicación para funcionar correctamente. Por favor, utiliza un navegador moderno que soporte geolocalización.",
+  "location.retry": "Reintentar"
 }

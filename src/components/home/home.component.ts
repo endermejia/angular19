@@ -9,11 +9,14 @@ import {
   ChangeDetectorRef,
   signal,
   WritableSignal,
+  AfterViewInit,
+  NgZone,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { TuiBottomSheet } from '@taiga-ui/addon-mobile';
 import { TuiButton, TuiTitle } from '@taiga-ui/core';
 import { TuiHeader } from '@taiga-ui/layout';
+import { TranslateService } from '@ngx-translate/core';
 // Import types only, not the actual library
 import type * as L from 'leaflet';
 
@@ -26,7 +29,7 @@ import type * as L from 'leaflet';
     class: 'flex grow',
   },
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, AfterViewInit {
   @ViewChild('buttons')
   protected readonly button?: ElementRef<HTMLElement>;
   protected readonly stops = ['112px'] as const;
@@ -49,6 +52,8 @@ export class HomeComponent implements OnInit {
   private markers: L.Marker[] = [];
   private readonly platformId = inject(PLATFORM_ID);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly translate = inject(TranslateService);
+  private readonly ngZone = inject(NgZone);
   // Property to store the dynamically imported Leaflet instance
   private L: typeof import('leaflet') | null = null;
 
@@ -59,68 +64,48 @@ export class HomeComponent implements OnInit {
       import('leaflet').then((L) => {
         // Store Leaflet instance for use in other methods
         this.L = L;
-        // Use setTimeout to ensure the DOM is fully ready
-        setTimeout(() => {
-          this.fixLeafletIconPaths();
-          this.initMap();
-        }, 300);
+        this.fixLeafletIconPaths();
       });
+    }
+  }
+
+  ngAfterViewInit(): void {
+    // Initialize the map after the view is initialized
+    if (isPlatformBrowser(this.platformId) && this.L) {
+      this.initMap();
+    } else if (isPlatformBrowser(this.platformId)) {
+      // If Leaflet is not loaded yet, wait for it
+      const checkLeaflet = () => {
+        if (this.L) {
+          this.initMap();
+        } else {
+          requestAnimationFrame(checkLeaflet);
+        }
+      };
+      requestAnimationFrame(checkLeaflet);
     }
   }
 
   private fixLeafletIconPaths(): void {
     if (!this.L) return;
 
-    // Fix Leaflet's default icon paths with absolute URLs
-    const baseUrl = window.location.origin + '/';
-    const iconRetinaUrl = baseUrl + 'assets/marker-icon-2x.png';
-    const iconUrl = baseUrl + 'assets/marker-icon.png';
-    const shadowUrl = baseUrl + 'assets/marker-shadow.png';
+    // Fix Leaflet's default icon paths
+    const iconRetinaUrl = 'assets/marker-icon-2x.png';
+    const iconUrl = 'assets/marker-icon.png';
+    const shadowUrl = 'assets/marker-shadow.png';
 
-    // Check if Icon and Icon.Default exist before trying to use them
-    if (this.L.Icon && this.L.Icon.Default) {
-      // @ts-ignore - Leaflet's typings don't include this property
-      delete this.L.Icon.Default.prototype._getIconUrl;
+    // @ts-ignore - Leaflet's typings don't include this property
+    delete this.L.Icon.Default.prototype._getIconUrl;
 
-      this.L.Icon.Default.mergeOptions({
-        iconRetinaUrl,
-        iconUrl,
-        shadowUrl,
-      });
-    } else {
-      console.warn('Leaflet Icon or Icon.Default is undefined. Using alternative approach.');
-
-      // If Icon.Default is not available, we can create a custom icon
-      if (this.L.icon) {
-        const defaultIcon = this.L.icon({
-          iconRetinaUrl,
-          iconUrl,
-          shadowUrl,
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41]
-        });
-
-        // Store it for later use
-        (this.L as any).defaultIcon = defaultIcon;
-      } else {
-        console.error('Leaflet icon functionality is not available');
-      }
-    }
+    this.L.Icon.Default.mergeOptions({
+      iconRetinaUrl,
+      iconUrl,
+      shadowUrl,
+    });
   }
 
   private initMap(): void {
     if (!this.L) return;
-
-    // Check if the map container exists
-    const mapContainer = document.getElementById('map');
-    if (!mapContainer) {
-      console.error('Map container not found');
-      // Try again after a short delay
-      setTimeout(() => this.initMap(), 500);
-      return;
-    }
 
     // Create the map instance with a temporary default view
     // We'll update it with the user's location as soon as it's available
@@ -131,13 +116,6 @@ export class HomeComponent implements OnInit {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors',
     }).addTo(this.map);
-
-    // Force a map resize after initialization to ensure proper rendering
-    setTimeout(() => {
-      if (this.map) {
-        this.map.invalidateSize();
-      }
-    }, 100);
 
     // Try to get user's current location first
     // The addRandomMarkers will be called after we get the user's location
@@ -154,23 +132,12 @@ export class HomeComponent implements OnInit {
           .setLatLng(this.map.getCenter())
           .setContent(
             `
-            <div style="text-align: center; padding: 10px;">
-              <h3 style="margin-bottom: 10px;">Permiso de ubicación</h3>
-              <p>Esta aplicación necesita acceder a tu ubicación para mostrarte lugares cercanos.</p>
-              <p>Por favor, permite el acceso cuando el navegador lo solicite.</p>
-              <button id="retry-location" style="
-                background-color: #4CAF50;
-                border: none;
-                color: white;
-                padding: 10px 20px;
-                text-align: center;
-                text-decoration: none;
-                display: inline-block;
-                font-size: 16px;
-                margin: 10px 0;
-                cursor: pointer;
-                border-radius: 4px;">
-                Permitir acceso
+            <div class="text-center p-4">
+              <h3 class="text-lg font-semibold mb-2">${this.translate.instant('location.permission.title')}</h3>
+              <p class="mb-2">${this.translate.instant('location.permission.message')}</p>
+              <p class="mb-4">${this.translate.instant('location.permission.allow')}</p>
+              <button id="retry-location" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded cursor-pointer">
+                ${this.translate.instant('location.permission.button')}
               </button>
             </div>
           `,
@@ -193,8 +160,8 @@ export class HomeComponent implements OnInit {
     } else {
       console.error('Geolocation is not supported by this browser.');
       this.showGeolocationError(
-        'Tu navegador no soporta geolocalización',
-        'Esta aplicación necesita acceso a tu ubicación para funcionar correctamente. Por favor, utiliza un navegador moderno que soporte geolocalización.',
+        this.translate.instant('location.error.unsupported.title'),
+        this.translate.instant('location.error.unsupported.message'),
       );
 
       // If geolocation is not supported, fall back to a default location
@@ -262,24 +229,36 @@ export class HomeComponent implements OnInit {
 
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = 'Permiso de ubicación denegado';
-            errorDetails =
-              'Has denegado el permiso para acceder a tu ubicación. Para utilizar todas las funciones de esta aplicación, por favor permite el acceso a tu ubicación.';
+            errorMessage = this.translate.instant(
+              'location.error.denied.title',
+            );
+            errorDetails = this.translate.instant(
+              'location.error.denied.message',
+            );
             break;
           case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Ubicación no disponible';
-            errorDetails =
-              'La información de tu ubicación no está disponible en este momento. Por favor, inténtalo de nuevo más tarde.';
+            errorMessage = this.translate.instant(
+              'location.error.unavailable.title',
+            );
+            errorDetails = this.translate.instant(
+              'location.error.unavailable.message',
+            );
             break;
           case error.TIMEOUT:
-            errorMessage = 'Tiempo de espera agotado';
-            errorDetails =
-              'La solicitud para obtener tu ubicación ha tardado demasiado tiempo. Por favor, inténtalo de nuevo.';
+            errorMessage = this.translate.instant(
+              'location.error.timeout.title',
+            );
+            errorDetails = this.translate.instant(
+              'location.error.timeout.message',
+            );
             break;
           default:
-            errorMessage = 'Error desconocido';
-            errorDetails =
-              'Ha ocurrido un error desconocido al intentar obtener tu ubicación. Por favor, inténtalo de nuevo más tarde.';
+            errorMessage = this.translate.instant(
+              'location.error.unknown.title',
+            );
+            errorDetails = this.translate.instant(
+              'location.error.unknown.message',
+            );
         }
 
         this.showGeolocationError(errorMessage, errorDetails);
@@ -304,39 +283,61 @@ export class HomeComponent implements OnInit {
         .setLatLng(this.map.getCenter())
         .setContent(
           `
-          <div style="text-align: center; padding: 10px;">
-            <h3 style="margin-bottom: 10px;">${title}</h3>
-            <p>${message}</p>
-            <button id="retry-location" style="
-              background-color: #4CAF50;
-              border: none;
-              color: white;
-              padding: 10px 20px;
-              text-align: center;
-              text-decoration: none;
-              display: inline-block;
-              font-size: 16px;
-              margin: 10px 0;
-              cursor: pointer;
-              border-radius: 4px;">
-              Reintentar
+          <div class="text-center p-4">
+            <h3 class="text-lg font-semibold mb-2">${title}</h3>
+            <p class="mb-4">${message}</p>
+            <button id="retry-location" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded cursor-pointer">
+              ${this.translate.instant('location.retry')}
             </button>
           </div>
         `,
         )
         .openOn(this.map);
 
-      // Add event listener to the retry button
-      setTimeout(() => {
-        const retryButton = document.getElementById('retry-location');
-        if (retryButton) {
-          retryButton.addEventListener('click', () => {
-            errorPopup.close();
-            this.requestGeolocation();
-          });
-        }
-      }, 100);
+      // Add event listener to the retry button using MutationObserver
+      this.addEventListenerToPopupButton('retry-location', () => {
+        errorPopup.close();
+        this.requestGeolocation();
+      });
     }
+  }
+
+  // Helper method to add event listeners to dynamically created buttons
+  private addEventListenerToPopupButton(
+    buttonId: string,
+    callback: () => void,
+  ): void {
+    // First try to get the button directly
+    const button = document.getElementById(buttonId);
+    if (button) {
+      this.ngZone.runOutsideAngular(() => {
+        button.addEventListener('click', () => {
+          this.ngZone.run(() => callback());
+        });
+      });
+      return;
+    }
+
+    // If button is not found, use MutationObserver to wait for it
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          const button = document.getElementById(buttonId);
+          if (button) {
+            this.ngZone.runOutsideAngular(() => {
+              button.addEventListener('click', () => {
+                this.ngZone.run(() => callback());
+              });
+            });
+            observer.disconnect();
+            break;
+          }
+        }
+      }
+    });
+
+    // Start observing the document body for DOM changes
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   // Helper method to update location info in the bottom-sheet

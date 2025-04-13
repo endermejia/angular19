@@ -10,5 +10,20 @@
   "Map": "Map",
   "Zones": "Zones",
   "Crags": "Crags",
-  "Menu": "Menu"
+  "Menu": "Menu",
+  "location.permission.title": "Location Permission",
+  "location.permission.message": "This application needs access to your location to show you nearby places.",
+  "location.permission.allow": "Please allow access when the browser requests it.",
+  "location.permission.button": "Allow Access",
+  "location.error.denied.title": "Location Permission Denied",
+  "location.error.denied.message": "You have denied permission to access your location. To use all features of this application, please allow access to your location.",
+  "location.error.unavailable.title": "Location Unavailable",
+  "location.error.unavailable.message": "Your location information is not available at this time. Please try again later.",
+  "location.error.timeout.title": "Timeout Expired",
+  "location.error.timeout.message": "The request to get your location took too long. Please try again.",
+  "location.error.unknown.title": "Unknown Error",
+  "location.error.unknown.message": "An unknown error occurred while trying to get your location. Please try again later.",
+  "location.error.unsupported.title": "Your browser does not support geolocation",
+  "location.error.unsupported.message": "This application needs access to your location to function properly. Please use a modern browser that supports geolocation.",
+  "location.retry": "Retry"
 }
