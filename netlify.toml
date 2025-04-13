@@ -1,0 +1,8 @@
+[build]
+  publish = "dist/angular19/browser"
+  command = "npm run build -- --configuration production"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.csr.html"
+  status = 200
