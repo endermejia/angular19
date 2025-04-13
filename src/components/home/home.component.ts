@@ -71,10 +71,11 @@ export class HomeComponent implements OnInit {
   private fixLeafletIconPaths(): void {
     if (!this.L) return;
 
-    // Fix Leaflet's default icon paths
-    const iconRetinaUrl = 'assets/marker-icon-2x.png';
-    const iconUrl = 'assets/marker-icon.png';
-    const shadowUrl = 'assets/marker-shadow.png';
+    // Fix Leaflet's default icon paths with absolute URLs
+    const baseUrl = window.location.origin + '/';
+    const iconRetinaUrl = baseUrl + 'assets/marker-icon-2x.png';
+    const iconUrl = baseUrl + 'assets/marker-icon.png';
+    const shadowUrl = baseUrl + 'assets/marker-shadow.png';
 
     // @ts-ignore - Leaflet's typings don't include this property
     delete this.L.Icon.Default.prototype._getIconUrl;
