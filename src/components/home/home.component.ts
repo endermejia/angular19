@@ -16,6 +16,7 @@ import { TuiBottomSheet } from '@taiga-ui/addon-mobile';
 import { TuiButton, TuiTitle } from '@taiga-ui/core';
 import { TuiHeader } from '@taiga-ui/layout';
 import { TranslateService } from '@ngx-translate/core';
+import { MapService } from '../../services';
 // Import types only, not the actual library
 import type * as L from 'leaflet';
 
@@ -24,6 +25,7 @@ import type * as L from 'leaflet';
   imports: [TuiBottomSheet, TuiButton, TuiTitle, TuiHeader],
   templateUrl: './home.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [MapService],
   host: {
     class: 'flex grow',
   },
@@ -52,27 +54,16 @@ export class HomeComponent implements OnInit, AfterViewInit {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly translate = inject(TranslateService);
   private readonly ngZone = inject(NgZone);
-  // Property to store the dynamically imported Leaflet instance
-  private L: typeof import('leaflet') | null = null;
+  private readonly mapService = inject(MapService);
+  // Property to access the Leaflet instance from the service
+  private get L(): typeof import('leaflet') | null {
+    return this.mapService.L;
+  }
 
   ngOnInit(): void {
     // Only initialize the map in the browser environment
-    if (isPlatformBrowser(this.platformId)) {
-      // Dynamically import Leaflet only in browser
-      import('leaflet')
-        .then((L) => {
-          // Store Leaflet instance for use in other methods
-          this.L = L;
-          this.fixLeafletIconPaths();
-        })
-        .catch((error) => {
-          console.error('Error loading Leaflet library:', error);
-          // Show a user-friendly error message
-          this.locationDescription.set(
-            this.translate.instant('location.error.map_load_failed') ||
-              'Failed to load map. Please refresh the page and try again.',
-          );
-        });
+    if (isPlatformBrowser(this.platformId) && this.L) {
+      this.fixLeafletIconPaths();
     }
   }
 
@@ -96,13 +87,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
   private fixLeafletIconPaths(): void {
     if (!this.L) return;
 
-    // Fix Leaflet's default icon paths using CDN URLs
-    const iconRetinaUrl =
-      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
-    const iconUrl =
-      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
-    const shadowUrl =
-      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
+    // Fix Leaflet's default icon paths using local files
+    const iconRetinaUrl = '/media/marker-icon-2x.png';
+    const iconUrl = '/media/marker-icon.png';
+    const shadowUrl = '/media/marker-shadow.png';
 
     // @ts-ignore - Leaflet's typings don't include this property
     delete this.L.Icon.Default.prototype._getIconUrl;
@@ -135,7 +123,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
   private getUserLocation(): void {
     if (!this.L) return;
 
-    if (navigator.geolocation) {
+    // Only access navigator.geolocation in browser environment
+    if (isPlatformBrowser(this.platformId) && typeof navigator !== 'undefined' && navigator.geolocation) {
       // Show a message to the user explaining why we need location access
       if (this.map && this.L) {
         const locationMessage = this.L.popup()
@@ -163,13 +152,16 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
       this.requestGeolocation();
     } else {
-      console.error('Geolocation is not supported by this browser.');
-      this.showGeolocationError(
-        this.translate.instant('location.error.unsupported.title'),
-        this.translate.instant('location.error.unsupported.message'),
-      );
+      console.error('Geolocation is not supported or not available in this environment.');
 
-      // If geolocation is not supported, fall back to a default location
+      if (isPlatformBrowser(this.platformId)) {
+        this.showGeolocationError(
+          this.translate.instant('location.error.unsupported.title'),
+          this.translate.instant('location.error.unsupported.message'),
+        );
+      }
+
+      // If geolocation is not supported or we're in SSR, fall back to a default location
       if (this.map) {
         this.map.setView([51.505, -0.09], 13);
         this.addRandomMarkers();
@@ -178,6 +170,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   private requestGeolocation(): void {
+    // Only run in browser environment
+    if (!isPlatformBrowser(this.platformId) || typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
@@ -299,6 +296,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   private showGeolocationError(title: string, message: string): void {
+    // Only run in browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
     if (this.map && this.L) {
       const errorPopup = this.L.popup()
         .setLatLng(this.map.getCenter())
@@ -328,6 +330,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
     buttonId: string,
     callback: () => void,
   ): void {
+    // Only run in browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
     // First try to get the button directly
     const button = document.getElementById(buttonId);
     if (button) {
@@ -340,25 +347,27 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
 
     // If button is not found, use MutationObserver to wait for it
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          const button = document.getElementById(buttonId);
-          if (button) {
-            this.ngZone.runOutsideAngular(() => {
-              button.addEventListener('click', () => {
-                this.ngZone.run(() => callback());
+    if (typeof MutationObserver !== 'undefined') {
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList') {
+            const button = document.getElementById(buttonId);
+            if (button) {
+              this.ngZone.runOutsideAngular(() => {
+                button.addEventListener('click', () => {
+                  this.ngZone.run(() => callback());
+                });
               });
-            });
-            observer.disconnect();
-            break;
+              observer.disconnect();
+              break;
+            }
           }
         }
-      }
-    });
+      });
 
-    // Start observing the document body for DOM changes
-    observer.observe(document.body, { childList: true, subtree: true });
+      // Start observing the document body for DOM changes
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   // Helper method to update location info in the bottom-sheet
