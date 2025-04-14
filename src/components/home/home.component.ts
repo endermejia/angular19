@@ -63,20 +63,27 @@ export class HomeComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     // Only initialize in the browser environment
     if (isPlatformBrowser(this.platformId)) {
-      // Use the Promise-based API to wait for Leaflet to load
-      this.mapService
-        .getLeaflet()
-        .then((leaflet) => {
-          if (leaflet) {
-            console.log('Leaflet loaded successfully in ngOnInit');
-            this.fixLeafletIconPaths();
-          } else {
-            console.warn('Leaflet failed to load in ngOnInit');
-          }
-        })
-        .catch((error) => {
-          console.error('Error loading Leaflet:', error);
-        });
+      // Run outside Angular's zone for better performance
+      this.ngZone.runOutsideAngular(() => {
+        // Use the Promise-based API to wait for Leaflet to load
+        this.mapService
+          .getLeaflet()
+          .then((leaflet) => {
+            if (leaflet) {
+              console.log('Leaflet loaded successfully in ngOnInit');
+
+              // Run back inside Angular's zone to ensure change detection
+              this.ngZone.run(() => {
+                this.fixLeafletIconPaths();
+              });
+            } else {
+              console.warn('Leaflet failed to load in ngOnInit');
+            }
+          })
+          .catch((error) => {
+            console.error('Error loading Leaflet:', error);
+          });
+      });
     }
   }
 
@@ -86,20 +93,44 @@ export class HomeComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    // Use the Promise-based API to wait for Leaflet to load
-    this.mapService
-      .getLeaflet()
-      .then((leaflet) => {
-        if (leaflet) {
-          console.log('Leaflet loaded successfully in ngAfterViewInit');
-          this.initMap();
-        } else {
-          console.warn('Leaflet failed to load in ngAfterViewInit');
-        }
-      })
-      .catch((error) => {
-        console.error('Error loading Leaflet:', error);
-      });
+    // Ensure we're running outside Angular's zone for better performance
+    this.ngZone.runOutsideAngular(() => {
+      // Use the Promise-based API to wait for Leaflet to load
+      this.mapService
+        .getLeaflet()
+        .then((leaflet) => {
+          if (leaflet) {
+            console.log('Leaflet loaded successfully in ngAfterViewInit');
+
+            // Ensure the Map constructor is available
+            if (typeof leaflet.Map === 'function') {
+              // Run map initialization back inside Angular's zone to ensure change detection
+              this.ngZone.run(() => {
+                this.initMap();
+              });
+            } else {
+              console.error('Leaflet Map constructor is not available in ngAfterViewInit');
+
+              // Wait a bit and try again - sometimes the constructor is not immediately available
+              setTimeout(() => {
+                if (leaflet && typeof leaflet.Map === 'function') {
+                  this.ngZone.run(() => {
+                    console.log('Leaflet Map constructor available after delay');
+                    this.initMap();
+                  });
+                } else {
+                  console.error('Leaflet Map constructor still not available after delay');
+                }
+              }, 500);
+            }
+          } else {
+            console.warn('Leaflet failed to load in ngAfterViewInit');
+          }
+        })
+        .catch((error) => {
+          console.error('Error loading Leaflet:', error);
+        });
+    });
   }
 
   private fixLeafletIconPaths(): void {
@@ -115,6 +146,29 @@ export class HomeComponent implements OnInit, AfterViewInit {
       // Create a custom icon class if Icon.Default is not available
       if (!this.L.Icon) {
         console.warn('Leaflet Icon class not available');
+
+        // Try to re-initialize Leaflet and check again
+        this.mapService.getLeaflet().then(leaflet => {
+          if (leaflet && leaflet.Icon) {
+            console.log('Successfully re-initialized Leaflet with Icon class');
+            this.fixLeafletIconPaths(); // Try again with the new instance
+          } else {
+            console.error('Leaflet Icon class still not available after re-initialization');
+
+            // Create a basic marker function as fallback if possible
+            if (leaflet && leaflet.Marker) {
+              const originalMarker = leaflet.Marker;
+              // @ts-ignore - Extending Marker prototype
+              leaflet.Marker = function(latlng, options) {
+                options = options || {};
+                return new originalMarker(latlng, options);
+              };
+              // @ts-ignore - Copying prototype
+              leaflet.Marker.prototype = originalMarker.prototype;
+              console.log('Created fallback marker implementation');
+            }
+          }
+        });
       } else if (!this.L.Icon.Default) {
         // Create a custom icon class
         const DefaultIcon = this.L.Icon.extend({
@@ -150,6 +204,23 @@ export class HomeComponent implements OnInit, AfterViewInit {
         console.warn(
           'Leaflet Icon.Default not available, could not fix icon paths',
         );
+
+        // Try to create a basic Default icon class
+        if (this.L.Icon) {
+          this.L.Icon.Default = this.L.Icon.extend({
+            options: {
+              iconUrl: iconUrl,
+              iconRetinaUrl: iconRetinaUrl,
+              shadowUrl: shadowUrl,
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              tooltipAnchor: [16, -28],
+              shadowSize: [41, 41]
+            }
+          });
+          console.log('Created fallback Icon.Default class');
+        }
       }
     } catch (error) {
       console.error('Error fixing Leaflet icon paths:', error);
@@ -159,19 +230,58 @@ export class HomeComponent implements OnInit, AfterViewInit {
   private initMap(): void {
     if (!this.L) return;
 
-    // Create the map instance with a temporary default view
-    // We'll update it with the user's location as soon as it's available
-    this.map = new this.L.Map('map').setView([0, 0], 2); // World view initially
+    try {
+      // Ensure we're in a browser environment
+      if (!isPlatformBrowser(this.platformId)) return;
 
-    // Add the OpenStreetMap tiles
-    this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(this.map);
+      // Ensure the map container exists
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) {
+        console.error('Map container not found');
+        return;
+      }
 
-    // Try to get user's current location first
-    // The addRandomMarkers will be called after we get the user's location
-    this.getUserLocation();
+      // Create the map instance with a temporary default view
+      // We'll update it with the user's location as soon as it's available
+      if (typeof this.L.Map !== 'function') {
+        console.error('Leaflet Map constructor is not available', this.L);
+
+        // Try to re-initialize Leaflet
+        this.mapService.getLeaflet().then(leaflet => {
+          if (leaflet && typeof leaflet.Map === 'function') {
+            console.log('Successfully re-initialized Leaflet');
+            this.map = new leaflet.Map('map').setView([0, 0], 2);
+
+            // Add the OpenStreetMap tiles
+            leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              attribution: '© OpenStreetMap contributors',
+            }).addTo(this.map);
+
+            // Try to get user's current location
+            this.getUserLocation();
+          } else {
+            console.error('Failed to re-initialize Leaflet');
+          }
+        });
+
+        return;
+      }
+
+      this.map = new this.L.Map('map').setView([0, 0], 2); // World view initially
+
+      // Add the OpenStreetMap tiles
+      this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(this.map);
+
+      // Try to get user's current location first
+      // The addRandomMarkers will be called after we get the user's location
+      this.getUserLocation();
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
   }
 
   private getUserLocation(): void {

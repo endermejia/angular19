@@ -31,6 +31,21 @@ export class MapService {
     try {
       // Dynamically import Leaflet only in browser environment
       const leaflet = await import('leaflet');
+
+      // Ensure CSS is loaded
+      if (typeof document !== 'undefined') {
+        // Check if Leaflet CSS is already loaded
+        if (!document.getElementById('leaflet-css')) {
+          const link = document.createElement('link');
+          link.id = 'leaflet-css';
+          link.rel = 'stylesheet';
+          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+          link.crossOrigin = '';
+          document.head.appendChild(link);
+        }
+      }
+
       this.L = leaflet;
       return leaflet;
     } catch (error) {
