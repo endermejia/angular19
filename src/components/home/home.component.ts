@@ -68,7 +68,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
         .getLeaflet()
         .then((leaflet) => {
           if (leaflet) {
+            console.log('Leaflet loaded successfully in ngOnInit');
             this.fixLeafletIconPaths();
+          } else {
+            console.warn('Leaflet failed to load in ngOnInit');
           }
         })
         .catch((error) => {
@@ -88,7 +91,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
       .getLeaflet()
       .then((leaflet) => {
         if (leaflet) {
+          console.log('Leaflet loaded successfully in ngAfterViewInit');
           this.initMap();
+        } else {
+          console.warn('Leaflet failed to load in ngAfterViewInit');
         }
       })
       .catch((error) => {
@@ -106,8 +112,30 @@ export class HomeComponent implements OnInit, AfterViewInit {
       const iconUrl = '/media/marker-icon.png';
       const shadowUrl = '/media/marker-shadow.png';
 
-      // Check if Icon.Default exists
-      if (this.L.Icon && this.L.Icon.Default && this.L.Icon.Default.prototype) {
+      // Create a custom icon class if Icon.Default is not available
+      if (!this.L.Icon) {
+        console.warn('Leaflet Icon class not available');
+      } else if (!this.L.Icon.Default) {
+        // Create a custom icon class
+        const DefaultIcon = this.L.Icon.extend({
+          options: {
+            iconUrl: iconUrl,
+            iconRetinaUrl: iconRetinaUrl,
+            shadowUrl: shadowUrl,
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            tooltipAnchor: [16, -28],
+            shadowSize: [41, 41]
+          }
+        });
+
+        // Set the default icon to our custom icon
+        this.L.Marker.prototype.options.icon = new DefaultIcon();
+
+        console.log('Created custom default icon for Leaflet markers');
+      } else if (this.L.Icon.Default.prototype) {
+        // If Icon.Default exists, use the standard approach
         // @ts-ignore - Leaflet's typings don't include this property
         delete this.L.Icon.Default.prototype._getIconUrl;
 
@@ -116,6 +144,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
           iconUrl,
           shadowUrl,
         });
+
+        console.log('Fixed Leaflet default icon paths');
       } else {
         console.warn(
           'Leaflet Icon.Default not available, could not fix icon paths',
@@ -131,7 +161,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
     // Create the map instance with a temporary default view
     // We'll update it with the user's location as soon as it's available
-    this.map = this.L.map('map').setView([0, 0], 2); // World view initially
+    this.map = new this.L.Map('map').setView([0, 0], 2); // World view initially
 
     // Add the OpenStreetMap tiles
     this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
