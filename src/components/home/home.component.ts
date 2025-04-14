@@ -61,45 +61,69 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   ngOnInit(): void {
-    // Only initialize the map in the browser environment
-    if (isPlatformBrowser(this.platformId) && this.L) {
-      this.fixLeafletIconPaths();
+    // Only initialize in the browser environment
+    if (isPlatformBrowser(this.platformId)) {
+      // Use the Promise-based API to wait for Leaflet to load
+      this.mapService
+        .getLeaflet()
+        .then((leaflet) => {
+          if (leaflet) {
+            this.fixLeafletIconPaths();
+          }
+        })
+        .catch((error) => {
+          console.error('Error loading Leaflet:', error);
+        });
     }
   }
 
   ngAfterViewInit(): void {
-    // Initialize the map after the view is initialized
-    if (isPlatformBrowser(this.platformId) && this.L) {
-      this.initMap();
-    } else if (isPlatformBrowser(this.platformId)) {
-      // If Leaflet is not loaded yet, wait for it
-      const checkLeaflet = () => {
-        if (this.L) {
-          this.initMap();
-        } else {
-          requestAnimationFrame(checkLeaflet);
-        }
-      };
-      requestAnimationFrame(checkLeaflet);
+    // Only proceed in browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
     }
+
+    // Use the Promise-based API to wait for Leaflet to load
+    this.mapService
+      .getLeaflet()
+      .then((leaflet) => {
+        if (leaflet) {
+          this.initMap();
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading Leaflet:', error);
+      });
   }
 
   private fixLeafletIconPaths(): void {
-    if (!this.L) return;
+    // Only run in browser environment
+    if (!isPlatformBrowser(this.platformId) || !this.L) return;
 
-    // Fix Leaflet's default icon paths using local files
-    const iconRetinaUrl = '/media/marker-icon-2x.png';
-    const iconUrl = '/media/marker-icon.png';
-    const shadowUrl = '/media/marker-shadow.png';
+    try {
+      // Fix Leaflet's default icon paths using local files
+      const iconRetinaUrl = '/media/marker-icon-2x.png';
+      const iconUrl = '/media/marker-icon.png';
+      const shadowUrl = '/media/marker-shadow.png';
 
-    // @ts-ignore - Leaflet's typings don't include this property
-    delete this.L.Icon.Default.prototype._getIconUrl;
+      // Check if Icon.Default exists
+      if (this.L.Icon && this.L.Icon.Default && this.L.Icon.Default.prototype) {
+        // @ts-ignore - Leaflet's typings don't include this property
+        delete this.L.Icon.Default.prototype._getIconUrl;
 
-    this.L.Icon.Default.mergeOptions({
-      iconRetinaUrl,
-      iconUrl,
-      shadowUrl,
-    });
+        this.L.Icon.Default.mergeOptions({
+          iconRetinaUrl,
+          iconUrl,
+          shadowUrl,
+        });
+      } else {
+        console.warn(
+          'Leaflet Icon.Default not available, could not fix icon paths',
+        );
+      }
+    } catch (error) {
+      console.error('Error fixing Leaflet icon paths:', error);
+    }
   }
 
   private initMap(): void {
@@ -124,41 +148,68 @@ export class HomeComponent implements OnInit, AfterViewInit {
     if (!this.L) return;
 
     // Only access navigator.geolocation in browser environment
-    if (isPlatformBrowser(this.platformId) && typeof navigator !== 'undefined' && navigator.geolocation) {
+    if (
+      isPlatformBrowser(this.platformId) &&
+      typeof navigator !== 'undefined' &&
+      navigator.geolocation
+    ) {
       // Show a message to the user explaining why we need location access
       if (this.map && this.L) {
-        const locationMessage = this.L.popup()
-          .setLatLng(this.map.getCenter())
-          .setContent(
-            `
-            <div class="text-center p-4">
-              <h3 class="text-lg font-semibold mb-2">${this.translate.instant('location.permission.title')}</h3>
-              <p class="mb-2">${this.translate.instant('location.permission.message')}</p>
-              <p class="mb-4">${this.translate.instant('location.permission.allow')}</p>
-              <button id="retry-location" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded cursor-pointer">
-                ${this.translate.instant('location.permission.button')}
-              </button>
-            </div>
-          `,
-          )
-          .openOn(this.map);
+        // Wait for translations to be loaded before showing the popup
+        this.translate
+          .get([
+            'location.permission.title',
+            'location.permission.message',
+            'location.permission.allow',
+            'location.permission.button',
+          ])
+          .subscribe((translations) => {
+            // Ensure map and L are still defined when callback executes
+            if (!this.map || !this.L) return;
 
-        // Add event listener to the retry button using MutationObserver
-        this.addEventListenerToPopupButton('retry-location', () => {
-          locationMessage.close();
-          this.requestGeolocation();
-        });
+            const locationMessage = this.L.popup()
+              .setLatLng(this.map.getCenter())
+              .setContent(
+                `
+              <div class="text-center p-4">
+                <h3 class="text-lg font-semibold mb-2">${translations['location.permission.title']}</h3>
+                <p class="mb-2">${translations['location.permission.message']}</p>
+                <p class="mb-4">${translations['location.permission.allow']}</p>
+                <button id="retry-location" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded cursor-pointer">
+                  ${translations['location.permission.button']}
+                </button>
+              </div>
+            `,
+              )
+              .openOn(this.map);
+
+            // Add event listener to the retry button using MutationObserver
+            this.addEventListenerToPopupButton('retry-location', () => {
+              locationMessage.close();
+              this.requestGeolocation();
+            });
+          });
       }
 
       this.requestGeolocation();
     } else {
-      console.error('Geolocation is not supported or not available in this environment.');
+      console.error(
+        'Geolocation is not supported or not available in this environment.',
+      );
 
       if (isPlatformBrowser(this.platformId)) {
-        this.showGeolocationError(
-          this.translate.instant('location.error.unsupported.title'),
-          this.translate.instant('location.error.unsupported.message'),
-        );
+        // Wait for translations to be loaded before showing the error
+        this.translate
+          .get([
+            'location.error.unsupported.title',
+            'location.error.unsupported.message',
+          ])
+          .subscribe((translations) => {
+            this.showGeolocationError(
+              translations['location.error.unsupported.title'],
+              translations['location.error.unsupported.message'],
+            );
+          });
       }
 
       // If geolocation is not supported or we're in SSR, fall back to a default location
@@ -171,7 +222,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   private requestGeolocation(): void {
     // Only run in browser environment
-    if (!isPlatformBrowser(this.platformId) || typeof navigator === 'undefined' || !navigator.geolocation) {
+    if (
+      !isPlatformBrowser(this.platformId) ||
+      typeof navigator === 'undefined' ||
+      !navigator.geolocation
+    ) {
       return;
     }
 
@@ -242,44 +297,31 @@ export class HomeComponent implements OnInit, AfterViewInit {
       (error) => {
         console.error('Error getting user location:', error);
 
-        let errorMessage = '';
-        let errorDetails = '';
+        // Determine which translation keys to use based on the error code
+        let titleKey = 'location.error.unknown.title';
+        let messageKey = 'location.error.unknown.message';
 
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = this.translate.instant(
-              'location.error.denied.title',
-            );
-            errorDetails = this.translate.instant(
-              'location.error.denied.message',
-            );
+            titleKey = 'location.error.denied.title';
+            messageKey = 'location.error.denied.message';
             break;
           case error.POSITION_UNAVAILABLE:
-            errorMessage = this.translate.instant(
-              'location.error.unavailable.title',
-            );
-            errorDetails = this.translate.instant(
-              'location.error.unavailable.message',
-            );
+            titleKey = 'location.error.unavailable.title';
+            messageKey = 'location.error.unavailable.message';
             break;
           case error.TIMEOUT:
-            errorMessage = this.translate.instant(
-              'location.error.timeout.title',
-            );
-            errorDetails = this.translate.instant(
-              'location.error.timeout.message',
-            );
+            titleKey = 'location.error.timeout.title';
+            messageKey = 'location.error.timeout.message';
             break;
-          default:
-            errorMessage = this.translate.instant(
-              'location.error.unknown.title',
-            );
-            errorDetails = this.translate.instant(
-              'location.error.unknown.message',
-            );
         }
 
-        this.showGeolocationError(errorMessage, errorDetails);
+        // Wait for translations to be loaded before showing the error
+        this.translate.get([titleKey, messageKey]).subscribe((translations) => {
+          const errorMessage = translations[titleKey];
+          const errorDetails = translations[messageKey];
+          this.showGeolocationError(errorMessage, errorDetails);
+        });
 
         // If we can't get the user's location, fall back to a default location (e.g., London)
         if (this.map) {
@@ -302,25 +344,31 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
 
     if (this.map && this.L) {
-      const errorPopup = this.L.popup()
-        .setLatLng(this.map.getCenter())
-        .setContent(
-          `
-          <div class="text-center p-4">
-            <h3 class="text-lg font-semibold mb-2">${title}</h3>
-            <p class="mb-4">${message}</p>
-            <button id="retry-location" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded cursor-pointer">
-              ${this.translate.instant('location.retry')}
-            </button>
-          </div>
-        `,
-        )
-        .openOn(this.map);
+      // Wait for translations to be loaded before showing the popup
+      this.translate.get(['location.retry']).subscribe((translations) => {
+        // Ensure map and L are still defined when callback executes
+        if (!this.map || !this.L) return;
 
-      // Add event listener to the retry button using MutationObserver
-      this.addEventListenerToPopupButton('retry-location', () => {
-        errorPopup.close();
-        this.requestGeolocation();
+        const errorPopup = this.L.popup()
+          .setLatLng(this.map.getCenter())
+          .setContent(
+            `
+            <div class="text-center p-4">
+              <h3 class="text-lg font-semibold mb-2">${title}</h3>
+              <p class="mb-4">${message}</p>
+              <button id="retry-location" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded cursor-pointer">
+                ${translations['location.retry']}
+              </button>
+            </div>
+          `,
+          )
+          .openOn(this.map);
+
+        // Add event listener to the retry button using MutationObserver
+        this.addEventListenerToPopupButton('retry-location', () => {
+          errorPopup.close();
+          this.requestGeolocation();
+        });
       });
     }
   }
