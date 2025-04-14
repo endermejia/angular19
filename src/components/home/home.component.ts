@@ -6,7 +6,6 @@ import {
   ViewChild,
   inject,
   PLATFORM_ID,
-  ChangeDetectorRef,
   signal,
   WritableSignal,
   AfterViewInit,
@@ -51,7 +50,6 @@ export class HomeComponent implements OnInit, AfterViewInit {
   private map?: L.Map;
   private markers: L.Marker[] = [];
   private readonly platformId = inject(PLATFORM_ID);
-  private readonly cdr = inject(ChangeDetectorRef);
   private readonly translate = inject(TranslateService);
   private readonly ngZone = inject(NgZone);
   // Property to store the dynamically imported Leaflet instance
@@ -60,144 +58,78 @@ export class HomeComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     // Only initialize the map in the browser environment
     if (isPlatformBrowser(this.platformId)) {
-      // Ensure Leaflet CSS is loaded
-      this.ensureLeafletCssLoaded();
-
       // Dynamically import Leaflet only in browser
       import('leaflet')
         .then((L) => {
           // Store Leaflet instance for use in other methods
           this.L = L;
-          console.log('Leaflet library loaded successfully');
-
-          // Small delay to ensure the library is fully initialized
-          setTimeout(() => {
-            this.fixLeafletIconPaths();
-          }, 100);
+          this.fixLeafletIconPaths();
         })
         .catch((error) => {
           console.error('Error loading Leaflet library:', error);
           // Show a user-friendly error message
           this.locationDescription.set(
             this.translate.instant('location.error.map_load_failed') ||
-            'Failed to load map. Please refresh the page and try again.'
+              'Failed to load map. Please refresh the page and try again.',
           );
         });
     }
   }
 
-  private ensureLeafletCssLoaded(): void {
-    // Check if Leaflet CSS is already loaded
-    const existingLink = document.querySelector('link[href*="leaflet.css"]');
-    if (!existingLink) {
-      console.log('Dynamically loading Leaflet CSS');
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-      link.crossOrigin = '';
-      document.head.appendChild(link);
-    } else {
-      console.log('Leaflet CSS already loaded');
-    }
-  }
-
   ngAfterViewInit(): void {
     // Initialize the map after the view is initialized
-    if (isPlatformBrowser(this.platformId)) {
-      if (this.L && this.L.Icon && this.L.Icon.Default) {
-        // Leaflet is fully loaded with Icon support
-        this.initMap();
-      } else {
-        // If Leaflet is not loaded yet or not fully initialized, wait for it
-        let attempts = 0;
-        const maxAttempts = 20; // Limit the number of attempts to prevent infinite loops
-
-        const checkLeaflet = () => {
-          attempts++;
-          if (this.L && this.L.Icon && this.L.Icon.Default) {
-            console.log('Leaflet fully loaded after', attempts, 'attempts');
-            this.initMap();
-          } else if (attempts < maxAttempts) {
-            console.log('Waiting for Leaflet to load, attempt', attempts);
-            setTimeout(checkLeaflet, 100); // Use setTimeout instead of requestAnimationFrame for more reliable timing
-          } else {
-            console.error('Failed to load Leaflet after', maxAttempts, 'attempts');
-          }
-        };
-
-        setTimeout(checkLeaflet, 100);
-      }
+    if (isPlatformBrowser(this.platformId) && this.L) {
+      this.initMap();
+    } else if (isPlatformBrowser(this.platformId)) {
+      // If Leaflet is not loaded yet, wait for it
+      const checkLeaflet = () => {
+        if (this.L) {
+          this.initMap();
+        } else {
+          requestAnimationFrame(checkLeaflet);
+        }
+      };
+      requestAnimationFrame(checkLeaflet);
     }
   }
 
   private fixLeafletIconPaths(): void {
     if (!this.L) return;
 
-    // Make sure L.Icon and L.Icon.Default exist before proceeding
-    if (!this.L.Icon || !this.L.Icon.Default) {
-      console.error('Leaflet Icon or Icon.Default is undefined');
-      return;
-    }
-
     // Fix Leaflet's default icon paths using CDN URLs
-    const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
-    const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
-    const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
+    const iconRetinaUrl =
+      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
+    const iconUrl =
+      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+    const shadowUrl =
+      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
 
-    try {
-      // @ts-ignore - Leaflet's typings don't include this property
-      delete this.L.Icon.Default.prototype._getIconUrl;
+    // @ts-ignore - Leaflet's typings don't include this property
+    delete this.L.Icon.Default.prototype._getIconUrl;
 
-      this.L.Icon.Default.mergeOptions({
-        iconRetinaUrl,
-        iconUrl,
-        shadowUrl,
-      });
-    } catch (error) {
-      console.error('Error configuring Leaflet icons:', error);
-    }
+    this.L.Icon.Default.mergeOptions({
+      iconRetinaUrl,
+      iconUrl,
+      shadowUrl,
+    });
   }
 
   private initMap(): void {
-    if (!this.L) {
-      console.error('Cannot initialize map: Leaflet library not loaded');
-      return;
-    }
+    if (!this.L) return;
 
-    if (!this.L.Icon || !this.L.Icon.Default) {
-      console.error('Cannot initialize map: Leaflet Icon not initialized');
-      return;
-    }
+    // Create the map instance with a temporary default view
+    // We'll update it with the user's location as soon as it's available
+    this.map = this.L.map('map').setView([0, 0], 2); // World view initially
 
-    try {
-      // Make sure the map container exists
-      const mapContainer = document.getElementById('map');
-      if (!mapContainer) {
-        console.error('Map container element not found');
-        return;
-      }
+    // Add the OpenStreetMap tiles
+    this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(this.map);
 
-      // Create the map instance with a temporary default view
-      // We'll update it with the user's location as soon as it's available
-      this.map = this.L.map('map').setView([0, 0], 2); // World view initially
-
-      console.log('Map instance created successfully');
-
-      // Add the OpenStreetMap tiles
-      this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors',
-      }).addTo(this.map);
-
-      console.log('Map tiles added successfully');
-
-      // Try to get user's current location first
-      // The addRandomMarkers will be called after we get the user's location
-      this.getUserLocation();
-    } catch (error) {
-      console.error('Error initializing map:', error);
-    }
+    // Try to get user's current location first
+    // The addRandomMarkers will be called after we get the user's location
+    this.getUserLocation();
   }
 
   private getUserLocation(): void {
@@ -255,11 +187,21 @@ export class HomeComponent implements OnInit, AfterViewInit {
           this.map.setView([latitude, longitude], 13);
 
           // Update the bottom-sheet with user location info
-          this.locationName.set(this.translate.instant('location.your_location'));
-          this.locationRegion.set(this.translate.instant('location.current_position'));
+          this.locationName.set(
+            this.translate.instant('location.your_location'),
+          );
+          this.locationRegion.set(
+            this.translate.instant('location.current_position'),
+          );
           this.locationDetails.set([
-            { label: this.translate.instant('location.details.latitude'), value: latitude.toFixed(6) },
-            { label: this.translate.instant('location.details.longitude'), value: longitude.toFixed(6) },
+            {
+              label: this.translate.instant('location.details.latitude'),
+              value: latitude.toFixed(6),
+            },
+            {
+              label: this.translate.instant('location.details.longitude'),
+              value: longitude.toFixed(6),
+            },
           ]);
           this.locationDescription.set(
             this.translate.instant('location.current_location_description'),
@@ -283,8 +225,14 @@ export class HomeComponent implements OnInit, AfterViewInit {
               this.translate.instant('location.your_location'),
               this.translate.instant('location.current_position'),
               [
-                { label: this.translate.instant('location.details.latitude'), value: latitude.toFixed(6) },
-                { label: this.translate.instant('location.details.longitude'), value: longitude.toFixed(6) },
+                {
+                  label: this.translate.instant('location.details.latitude'),
+                  value: latitude.toFixed(6),
+                },
+                {
+                  label: this.translate.instant('location.details.longitude'),
+                  value: longitude.toFixed(6),
+                },
               ],
               this.translate.instant('location.current_location_description'),
             );
@@ -443,9 +391,15 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
     const parkType = this.translate.instant('location.type.park').toLowerCase();
     const cafeType = this.translate.instant('location.type.cafe').toLowerCase();
-    const museumType = this.translate.instant('location.type.museum').toLowerCase();
-    const libraryType = this.translate.instant('location.type.library').toLowerCase();
-    const marketType = this.translate.instant('location.type.market').toLowerCase();
+    const museumType = this.translate
+      .instant('location.type.museum')
+      .toLowerCase();
+    const libraryType = this.translate
+      .instant('location.type.library')
+      .toLowerCase();
+    const marketType = this.translate
+      .instant('location.type.market')
+      .toLowerCase();
 
     switch (locationType) {
       case parkType:
@@ -493,40 +447,40 @@ export class HomeComponent implements OnInit, AfterViewInit {
         details: [
           this.translate.instant('location.feature.park.1'),
           this.translate.instant('location.feature.park.2'),
-          this.translate.instant('location.feature.park.3')
-        ]
+          this.translate.instant('location.feature.park.3'),
+        ],
       },
       {
         name: this.translate.instant('location.type.cafe'),
         details: [
           this.translate.instant('location.feature.cafe.1'),
           this.translate.instant('location.feature.cafe.2'),
-          this.translate.instant('location.feature.cafe.3')
-        ]
+          this.translate.instant('location.feature.cafe.3'),
+        ],
       },
       {
         name: this.translate.instant('location.type.museum'),
         details: [
           this.translate.instant('location.feature.museum.1'),
           this.translate.instant('location.feature.museum.2'),
-          this.translate.instant('location.feature.museum.3')
-        ]
+          this.translate.instant('location.feature.museum.3'),
+        ],
       },
       {
         name: this.translate.instant('location.type.library'),
         details: [
           this.translate.instant('location.feature.library.1'),
           this.translate.instant('location.feature.library.2'),
-          this.translate.instant('location.feature.library.3')
-        ]
+          this.translate.instant('location.feature.library.3'),
+        ],
       },
       {
         name: this.translate.instant('location.type.market'),
         details: [
           this.translate.instant('location.feature.market.1'),
           this.translate.instant('location.feature.market.2'),
-          this.translate.instant('location.feature.market.3')
-        ]
+          this.translate.instant('location.feature.market.3'),
+        ],
       },
     ];
 
@@ -544,18 +498,32 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
       // Create marker details
       const details = [
-        { label: this.translate.instant('location.details.type'), value: locationType.name },
-        { label: this.translate.instant('location.details.latitude'), value: markerLat.toFixed(6) },
-        { label: this.translate.instant('location.details.longitude'), value: markerLng.toFixed(6) },
-        { label: this.translate.instant('location.details.features'), value: locationType.details.join(', ') },
+        {
+          label: this.translate.instant('location.details.type'),
+          value: locationType.name,
+        },
+        {
+          label: this.translate.instant('location.details.latitude'),
+          value: markerLat.toFixed(6),
+        },
+        {
+          label: this.translate.instant('location.details.longitude'),
+          value: markerLng.toFixed(6),
+        },
+        {
+          label: this.translate.instant('location.details.features'),
+          value: locationType.details.join(', '),
+        },
       ];
 
       // Create description
       const distance = (Math.random() * 2).toFixed(1);
-      const description = this.translate.instant(
-        'location.description',
-        [locationType.name.toLowerCase(), distance, locationType.name, locationType.details[0].toLowerCase()]
-      );
+      const description = this.translate.instant('location.description', [
+        locationType.name.toLowerCase(),
+        distance,
+        locationType.name,
+        locationType.details[0].toLowerCase(),
+      ]);
 
       const marker = this.L.marker([markerLat, markerLng])
         .addTo(this.map)
