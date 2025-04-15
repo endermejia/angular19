@@ -18,10 +18,17 @@ export class MapService {
 
   /**
    * Returns a promise that resolves when Leaflet is loaded
+   * @param forceReload If true, forces a new load of Leaflet even if it's already loaded
    */
-  public getLeaflet(): Promise<typeof L | null> {
+  public getLeaflet(forceReload: boolean = false): Promise<typeof L | null> {
     if (!isPlatformBrowser(this.platformId)) {
       return Promise.resolve(null);
+    }
+
+    // If forceReload is true, create a new load promise
+    if (forceReload) {
+      this.L = null; // Reset the current instance
+      this.leafletLoadPromise = this.loadLeaflet();
     }
 
     return this.leafletLoadPromise || Promise.resolve(this.L);
@@ -29,13 +36,26 @@ export class MapService {
 
   private async loadLeaflet(): Promise<typeof L | null> {
     try {
+      console.log('Loading Leaflet dynamically...');
+
       // Dynamically import Leaflet only in browser environment
       const leaflet = await import('leaflet');
+
+      console.log('Leaflet imported successfully, checking if Map constructor is available...');
+
+      // Verify that the Map constructor is available
+      if (!leaflet.Map) {
+        console.error('Leaflet loaded but Map constructor is not available');
+        return null;
+      }
+
+      console.log('Leaflet Map constructor is available');
 
       // Ensure CSS is loaded
       if (typeof document !== 'undefined') {
         // Check if Leaflet CSS is already loaded
         if (!document.getElementById('leaflet-css')) {
+          console.log('Adding Leaflet CSS to document head');
           const link = document.createElement('link');
           link.id = 'leaflet-css';
           link.rel = 'stylesheet';

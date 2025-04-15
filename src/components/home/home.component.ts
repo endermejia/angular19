@@ -69,17 +69,28 @@ export class HomeComponent implements AfterViewInit {
     this.initializeMap();
   }
 
-  private initializeMap(): void {
+  private initializeMap(retryCount: number = 0): void {
     // Only proceed in browser environment
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
 
+    console.log(`Initializing map (attempt ${retryCount + 1})...`);
+
     // Use the Promise-based API to wait for Leaflet to load
     this.mapService
-      .getLeaflet()
+      .getLeaflet(retryCount > 0) // Force reload on retry
       .then((leaflet) => {
         if (!leaflet) {
+          console.error('Leaflet not loaded');
+          this.handleLeafletLoadError(retryCount);
+          return;
+        }
+
+        // Verify Map constructor is available
+        if (!leaflet.Map) {
+          console.error('Leaflet Map constructor not available');
+          this.handleLeafletLoadError(retryCount);
           return;
         }
 
@@ -91,7 +102,20 @@ export class HomeComponent implements AfterViewInit {
       })
       .catch((error) => {
         console.error('Error loading Leaflet:', error);
+        this.handleLeafletLoadError(retryCount);
       });
+  }
+
+  private handleLeafletLoadError(retryCount: number): void {
+    if (retryCount < 3) { // Maximum 3 retry attempts
+      console.log(`Retrying Leaflet initialization (${retryCount + 1}/3)...`);
+      // Wait a bit longer on each retry
+      setTimeout(() => {
+        this.initializeMap(retryCount + 1);
+      }, 1000 * (retryCount + 1)); // Increasing delay: 1s, 2s, 3s
+    } else {
+      console.error('Failed to initialize Leaflet after multiple attempts');
+    }
   }
 
   private setupLeafletIcons(): void {
@@ -133,6 +157,14 @@ export class HomeComponent implements AfterViewInit {
       // Set up icons
       this.setupLeafletIcons();
 
+      // Ensure Leaflet.Map is available
+      if (!this.L.Map) {
+        console.error('Leaflet Map constructor not available');
+        // Try to reload Leaflet
+        this.reloadLeaflet();
+        return;
+      }
+
       // Create the map with a default world view
       this.map = new this.L.Map('map').setView([0, 0], 2);
 
@@ -146,6 +178,8 @@ export class HomeComponent implements AfterViewInit {
       this.getUserLocation();
     } catch (error) {
       console.error('Error initializing map:', error);
+      // Try to reload Leaflet on error
+      this.reloadLeaflet();
     }
   }
 
@@ -210,6 +244,41 @@ export class HomeComponent implements AfterViewInit {
   private handleGeolocationError(error: GeolocationPositionError): void {
     console.error('Error getting user location:', error);
     this.useDefaultLocation();
+  }
+
+  private reloadLeaflet(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    console.log('Attempting to reload Leaflet...');
+
+    // Reset the map instance
+    if (this.map) {
+      try {
+        this.map.remove();
+      } catch (e) {
+        console.error('Error removing map:', e);
+      }
+      this.map = undefined;
+    }
+
+    // Wait a bit before trying again
+    setTimeout(() => {
+      // Force a new load of Leaflet
+      this.mapService.getLeaflet(true)
+        .then((leaflet) => {
+          if (!leaflet) {
+            console.error('Failed to reload Leaflet');
+            return;
+          }
+
+          console.log('Leaflet reloaded successfully, reinitializing map...');
+          this.initMap();
+          this.cdr.markForCheck();
+        })
+        .catch((error) => {
+          console.error('Error reloading Leaflet:', error);
+        });
+    }, 500);
   }
 
   private useDefaultLocation(): void {
