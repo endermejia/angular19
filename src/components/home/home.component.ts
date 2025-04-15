@@ -69,7 +69,7 @@ export class HomeComponent implements AfterViewInit {
     this.initializeMap();
   }
 
-  private initializeMap(retryCount: number = 0): void {
+  private async initializeMap(retryCount: number = 0): Promise<void> {
     // Only proceed in browser environment
     if (!isPlatformBrowser(this.platformId)) {
       return;
@@ -77,33 +77,32 @@ export class HomeComponent implements AfterViewInit {
 
     console.log(`Initializing map (attempt ${retryCount + 1})...`);
 
-    // Use the Promise-based API to wait for Leaflet to load
-    this.mapService
-      .getLeaflet(retryCount > 0) // Force reload on retry
-      .then((leaflet) => {
-        if (!leaflet) {
-          console.error('Leaflet not loaded');
-          this.handleLeafletLoadError(retryCount);
-          return;
-        }
+    try {
+      // Use the enhanced method to ensure Leaflet is fully loaded
+      const leaflet = await this.mapService.ensureLeafletLoaded();
 
-        // Verify Map constructor is available
-        if (!leaflet.Map) {
-          console.error('Leaflet Map constructor not available');
-          this.handleLeafletLoadError(retryCount);
-          return;
-        }
-
-        // Initialize the map
-        this.initMap();
-
-        // Trigger change detection
-        this.cdr.markForCheck();
-      })
-      .catch((error) => {
-        console.error('Error loading Leaflet:', error);
+      if (!leaflet) {
+        console.error('Failed to load Leaflet after multiple attempts');
         this.handleLeafletLoadError(retryCount);
-      });
+        return;
+      }
+
+      // Double-check Map constructor is available
+      if (!leaflet.Map) {
+        console.error('Leaflet Map constructor not available after loading');
+        this.handleLeafletLoadError(retryCount);
+        return;
+      }
+
+      // Initialize the map
+      this.initMap();
+
+      // Trigger change detection
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error initializing Leaflet:', error);
+      this.handleLeafletLoadError(retryCount);
+    }
   }
 
   private handleLeafletLoadError(retryCount: number): void {
@@ -144,7 +143,10 @@ export class HomeComponent implements AfterViewInit {
   }
 
   private initMap(): void {
-    if (!this.L) return;
+    if (!this.L) {
+      console.error('Leaflet not available in initMap');
+      return;
+    }
 
     try {
       // Ensure the map container exists
@@ -157,25 +159,67 @@ export class HomeComponent implements AfterViewInit {
       // Set up icons
       this.setupLeafletIcons();
 
-      // Ensure Leaflet.Map is available
+      // Triple-check Leaflet.Map is available
       if (!this.L.Map) {
-        console.error('Leaflet Map constructor not available');
+        console.error('Leaflet Map constructor not available in initMap');
         // Try to reload Leaflet
         this.reloadLeaflet();
         return;
       }
 
-      // Create the map with a default world view
-      this.map = new this.L.Map('map').setView([0, 0], 2);
+      // Verify that Map is a constructor function
+      if (typeof this.L.Map !== 'function') {
+        console.error('Leaflet Map is not a constructor function');
+        // Try to reload Leaflet
+        this.reloadLeaflet();
+        return;
+      }
 
-      // Add the OpenStreetMap tiles
-      this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors',
-      }).addTo(this.map);
+      console.log('Creating map instance...');
 
-      // Get user location and add markers
-      this.getUserLocation();
+      try {
+        // Create the map with a default world view
+        this.map = new this.L.Map('map').setView([0, 0], 2);
+
+        console.log('Map instance created successfully');
+
+        // Add the OpenStreetMap tiles
+        this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors',
+        }).addTo(this.map);
+
+        // Get user location and add markers
+        this.getUserLocation();
+      } catch (mapError) {
+        console.error('Error creating map instance:', mapError);
+
+        // Try one more approach - create with a delay
+        setTimeout(() => {
+          try {
+            if (!this.L || !this.L.Map) {
+              console.error('Leaflet not available after delay');
+              return;
+            }
+
+            console.log('Attempting to create map after delay...');
+            this.map = new this.L.Map('map').setView([0, 0], 2);
+
+            // Add the OpenStreetMap tiles
+            this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              attribution: '© OpenStreetMap contributors',
+            }).addTo(this.map);
+
+            // Get user location and add markers
+            this.getUserLocation();
+
+            this.cdr.markForCheck();
+          } catch (delayedError) {
+            console.error('Error creating map after delay:', delayedError);
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error initializing map:', error);
       // Try to reload Leaflet on error
@@ -246,7 +290,7 @@ export class HomeComponent implements AfterViewInit {
     this.useDefaultLocation();
   }
 
-  private reloadLeaflet(): void {
+  private async reloadLeaflet(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
 
     console.log('Attempting to reload Leaflet...');
@@ -261,24 +305,30 @@ export class HomeComponent implements AfterViewInit {
       this.map = undefined;
     }
 
-    // Wait a bit before trying again
-    setTimeout(() => {
-      // Force a new load of Leaflet
-      this.mapService.getLeaflet(true)
-        .then((leaflet) => {
-          if (!leaflet) {
-            console.error('Failed to reload Leaflet');
-            return;
-          }
+    try {
+      // Wait a bit before trying again
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-          console.log('Leaflet reloaded successfully, reinitializing map...');
-          this.initMap();
-          this.cdr.markForCheck();
-        })
-        .catch((error) => {
-          console.error('Error reloading Leaflet:', error);
-        });
-    }, 500);
+      // Use the enhanced method to ensure Leaflet is fully loaded
+      const leaflet = await this.mapService.ensureLeafletLoaded();
+
+      if (!leaflet) {
+        console.error('Failed to reload Leaflet after multiple attempts');
+        return;
+      }
+
+      // Double-check Map constructor is available
+      if (!leaflet.Map) {
+        console.error('Leaflet Map constructor not available after reloading');
+        return;
+      }
+
+      console.log('Leaflet reloaded successfully, reinitializing map...');
+      this.initMap();
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('Error reloading Leaflet:', error);
+    }
   }
 
   private useDefaultLocation(): void {

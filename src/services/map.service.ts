@@ -8,6 +8,8 @@ export class MapService {
 
   public L: typeof L | null = null;
   private leafletLoadPromise: Promise<typeof L | null> | null = null;
+  private loadAttempts = 0;
+  private readonly MAX_LOAD_ATTEMPTS = 3;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {
     // Only load Leaflet in browser environment
@@ -28,15 +30,50 @@ export class MapService {
     // If forceReload is true, create a new load promise
     if (forceReload) {
       this.L = null; // Reset the current instance
+      this.loadAttempts = 0; // Reset load attempts counter
       this.leafletLoadPromise = this.loadLeaflet();
     }
 
     return this.leafletLoadPromise || Promise.resolve(this.L);
   }
 
+  /**
+   * Ensures that Leaflet is fully loaded and the Map constructor is available
+   * This method will retry loading Leaflet if necessary
+   */
+  public async ensureLeafletLoaded(): Promise<typeof L | null> {
+    if (!isPlatformBrowser(this.platformId)) {
+      return null;
+    }
+
+    // Try to get Leaflet
+    let leaflet = await this.getLeaflet();
+
+    // If Leaflet is not loaded or Map constructor is not available, try to reload
+    if (!leaflet || !leaflet.Map) {
+      console.warn('Leaflet not properly loaded, attempting to reload...');
+
+      // Reset and try again
+      this.L = null;
+      this.loadAttempts = 0;
+      this.leafletLoadPromise = this.loadLeaflet();
+
+      // Wait for reload
+      leaflet = await this.leafletLoadPromise;
+    }
+
+    return leaflet;
+  }
+
   private async loadLeaflet(): Promise<typeof L | null> {
     try {
-      console.log('Loading Leaflet dynamically...');
+      this.loadAttempts++;
+      console.log(`Loading Leaflet dynamically (attempt ${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`);
+
+      // Add a small delay before loading to ensure the browser is ready
+      if (this.loadAttempts > 1) {
+        await new Promise(resolve => setTimeout(resolve, 500 * this.loadAttempts));
+      }
 
       // Dynamically import Leaflet only in browser environment
       const leaflet = await import('leaflet');
@@ -46,6 +83,13 @@ export class MapService {
       // Verify that the Map constructor is available
       if (!leaflet.Map) {
         console.error('Leaflet loaded but Map constructor is not available');
+
+        // If we haven't reached the maximum number of attempts, try again
+        if (this.loadAttempts < this.MAX_LOAD_ATTEMPTS) {
+          console.log(`Retrying Leaflet load (${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`);
+          return this.loadLeaflet();
+        }
+
         return null;
       }
 
@@ -66,10 +110,32 @@ export class MapService {
         }
       }
 
+      // Add a small delay to ensure everything is properly initialized
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Double-check that Map constructor is still available
+      if (!leaflet.Map) {
+        console.error('Map constructor disappeared after loading');
+
+        // If we haven't reached the maximum number of attempts, try again
+        if (this.loadAttempts < this.MAX_LOAD_ATTEMPTS) {
+          return this.loadLeaflet();
+        }
+
+        return null;
+      }
+
       this.L = leaflet;
       return leaflet;
     } catch (error) {
       console.error('Error loading Leaflet:', error);
+
+      // If we haven't reached the maximum number of attempts, try again
+      if (this.loadAttempts < this.MAX_LOAD_ATTEMPTS) {
+        console.log(`Retrying after error (${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`);
+        return this.loadLeaflet();
+      }
+
       return null;
     }
   }
