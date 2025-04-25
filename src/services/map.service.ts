@@ -5,24 +5,20 @@ import type * as L from 'leaflet';
 
 @Injectable()
 export class MapService {
-
   public L: typeof L | null = null;
   private leafletLoadPromise: Promise<typeof L | null> | null = null;
   private loadAttempts = 0;
   private readonly MAX_LOAD_ATTEMPTS = 3;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {
-    // Only load Leaflet in browser environment
-    if (isPlatformBrowser(platformId)) {
-      this.leafletLoadPromise = this.loadLeaflet();
-    }
+    // Don't load Leaflet in the constructor - wait for explicit request
   }
 
   /**
    * Returns a promise that resolves when Leaflet is loaded
    * @param forceReload If true, forces a new load of Leaflet even if it's already loaded
    */
-  public getLeaflet(forceReload: boolean = false): Promise<typeof L | null> {
+  public getLeaflet(forceReload = false): Promise<typeof L | null> {
     if (!isPlatformBrowser(this.platformId)) {
       return Promise.resolve(null);
     }
@@ -66,19 +62,44 @@ export class MapService {
   }
 
   private async loadLeaflet(): Promise<typeof L | null> {
+    // Ensure we're in a browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      console.log('Not in browser environment, skipping Leaflet load');
+      return null;
+    }
+
     try {
       this.loadAttempts++;
-      console.log(`Loading Leaflet dynamically (attempt ${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`);
+      console.log(
+        `Loading Leaflet dynamically (attempt ${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`,
+      );
 
       // Add a small delay before loading to ensure the browser is ready
       if (this.loadAttempts > 1) {
-        await new Promise(resolve => setTimeout(resolve, 500 * this.loadAttempts));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 * this.loadAttempts),
+        );
+      }
+
+      // Make sure window is defined before trying to load Leaflet
+      if (typeof window === 'undefined') {
+        console.error('Window is not defined, cannot load Leaflet');
+        return null;
+      }
+
+      // Check if Leaflet is already available on the window object
+      if (window.L && typeof window.L.Map === 'function') {
+        console.log('Leaflet already available on window object, using it');
+        this.L = window.L as unknown as typeof L;
+        return this.L;
       }
 
       // Dynamically import Leaflet only in browser environment
       const leaflet = await import('leaflet');
 
-      console.log('Leaflet imported successfully, checking if Map constructor is available...');
+      console.log(
+        'Leaflet imported successfully, checking if Map constructor is available...',
+      );
 
       // Verify that the Map constructor is available
       if (!leaflet.Map) {
@@ -86,7 +107,9 @@ export class MapService {
 
         // If we haven't reached the maximum number of attempts, try again
         if (this.loadAttempts < this.MAX_LOAD_ATTEMPTS) {
-          console.log(`Retrying Leaflet load (${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`);
+          console.log(
+            `Retrying Leaflet load (${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`,
+          );
           return this.loadLeaflet();
         }
 
@@ -95,23 +118,11 @@ export class MapService {
 
       console.log('Leaflet Map constructor is available');
 
-      // Ensure CSS is loaded
-      if (typeof document !== 'undefined') {
-        // Check if Leaflet CSS is already loaded
-        if (!document.getElementById('leaflet-css')) {
-          console.log('Adding Leaflet CSS to document head');
-          const link = document.createElement('link');
-          link.id = 'leaflet-css';
-          link.rel = 'stylesheet';
-          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-          link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-          link.crossOrigin = '';
-          document.head.appendChild(link);
-        }
-      }
+      // We don't need to load CSS here as it's already included in index.html and angular.json
+      // This avoids potential issues with duplicate CSS loading
 
       // Add a small delay to ensure everything is properly initialized
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       // Double-check that Map constructor is still available
       if (!leaflet.Map) {
@@ -125,6 +136,9 @@ export class MapService {
         return null;
       }
 
+      // Store Leaflet on window for potential reuse
+      window.L = leaflet as unknown as any;
+
       this.L = leaflet;
       return leaflet;
     } catch (error) {
@@ -132,7 +146,9 @@ export class MapService {
 
       // If we haven't reached the maximum number of attempts, try again
       if (this.loadAttempts < this.MAX_LOAD_ATTEMPTS) {
-        console.log(`Retrying after error (${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`);
+        console.log(
+          `Retrying after error (${this.loadAttempts}/${this.MAX_LOAD_ATTEMPTS})...`,
+        );
         return this.loadLeaflet();
       }
 
