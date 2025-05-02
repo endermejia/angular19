@@ -49,15 +49,10 @@ export class HomeComponent implements AfterViewInit {
   protected websiteUrl: WritableSignal<string> = signal('');
 
   private map?: L.Map;
-  private markers: L.Marker[] = [];
   private readonly platformId = inject(PLATFORM_ID);
   private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly mapService = inject(MapService);
-  // Property to access the Leaflet instance from the service
-  private get L(): typeof import('leaflet') | null {
-    return this.mapService.L;
-  }
 
   ngAfterViewInit(): void {
     // Only proceed in browser environment
@@ -111,8 +106,22 @@ export class HomeComponent implements AfterViewInit {
         return;
       }
 
-      // Initialize the map
-      this.initMap();
+      // Initialize the map using the MapService
+      this.map = this.mapService.initMap('map');
+
+      if (!this.map) {
+        console.error('Failed to initialize map');
+        this.handleLeafletLoadError(retryCount);
+        return;
+      }
+
+      // Get user location and add markers
+      this.mapService.getUserLocation(
+        // Success callback
+        (position) => this.handleGeolocationSuccess(position),
+        // Error callback
+        () => this.mapService.useDefaultLocation(),
+      );
 
       // Trigger change detection
       this.cdr.markForCheck();
@@ -129,7 +138,11 @@ export class HomeComponent implements AfterViewInit {
       // Wait a bit longer on each retry
       setTimeout(
         () => {
-          this.initializeMap(retryCount + 1);
+          // Try to reload Leaflet using the MapService
+          this.mapService.reloadLeaflet('map').then(() => {
+            // After reloading, try to initialize the map again
+            this.initializeMap(retryCount + 1);
+          });
         },
         1000 * (retryCount + 1),
       ); // Increasing delay: 1s, 2s, 3s
@@ -138,283 +151,10 @@ export class HomeComponent implements AfterViewInit {
     }
   }
 
-  private setupLeafletIcons(): void {
-    if (!this.L || !isPlatformBrowser(this.platformId)) return;
-
-    try {
-      console.log('Setting up Leaflet icons...');
-
-      // Check if window.L is available and use it if it is
-      if (typeof window !== 'undefined' && window.L) {
-        if (window.L.Icon && typeof window.L.Icon === 'function') {
-          console.log('Using Leaflet Icon from window object');
-          if (!this.L.Icon) {
-            this.L.Icon = window.L.Icon as any;
-          }
-        }
-      }
-
-      // First, check if Icon class exists
-      if (!this.L.Icon) {
-        console.error('Leaflet Icon class not available');
-        return;
-      }
-
-      // Check if the Default icon class exists
-      if (!this.L.Icon.Default) {
-        console.warn('Leaflet Icon.Default not available, creating fallback');
-
-        // Create a basic fallback for Icon.Default if it doesn't exist
-        this.L.Icon.Default = this.L.Icon.extend({
-          options: {
-            iconUrl:
-              'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            iconRetinaUrl:
-              'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            shadowUrl:
-              'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            tooltipAnchor: [16, -28],
-            shadowSize: [41, 41],
-          },
-        }) as unknown as typeof this.L.Icon.Default;
-      }
-
-      // Set the path to the icons folder on the CDN
-      if (this.L.Icon.Default) {
-        console.log('Setting Leaflet Icon.Default imagePath');
-        this.L.Icon.Default.imagePath =
-          'https://unpkg.com/leaflet@1.9.4/dist/images/';
-
-        try {
-          // Create a new instance of the default icon to ensure it's properly initialized
-          const defaultIcon = new this.L.Icon.Default();
-          console.log('Default icon created successfully');
-
-          // Set as the default icon for markers
-          if (this.L.Marker && this.L.Marker.prototype) {
-            this.L.Marker.prototype.options =
-              this.L.Marker.prototype.options || {};
-            this.L.Marker.prototype.options.icon = defaultIcon;
-            console.log('Default icon set for markers');
-          }
-        } catch (iconError) {
-          console.error('Error creating default icon:', iconError);
-
-          // Fallback to basic marker if default icon creation fails
-          if (this.L.Marker && this.L.Marker.prototype) {
-            console.log('Using basic marker options as fallback');
-            this.L.Marker.prototype.options =
-              this.L.Marker.prototype.options || {};
-            // Clear any existing icon to use Leaflet's internal fallback
-            delete this.L.Marker.prototype.options.icon;
-          }
-        }
-      } else {
-        console.error('Failed to create or find Icon.Default class');
-      }
-    } catch (error) {
-      console.error('Error setting up Leaflet icons:', error);
-    }
-  }
-
-  private initMap(): void {
-    // Double-check we're in browser environment
-    if (!isPlatformBrowser(this.platformId)) {
-      console.log('Not in browser environment, skipping map initialization');
-      return;
-    }
-
-    if (!this.L) {
-      console.error('Leaflet not available in initMap');
-      return;
-    }
-
-    try {
-      // Ensure the map container exists
-      const mapContainer = document.getElementById('map');
-      if (!mapContainer) {
-        console.error('Map container not found');
-        return;
-      }
-
-      // Set up icons
-      this.setupLeafletIcons();
-
-      // Triple-check Leaflet.Map is available
-      if (!this.L.Map) {
-        console.error('Leaflet Map constructor not available in initMap');
-        // Try to reload Leaflet
-        this.reloadLeaflet();
-        return;
-      }
-
-      // Verify that Map is a constructor function
-      if (typeof this.L.Map !== 'function') {
-        console.error('Leaflet Map is not a constructor function');
-        // Try to reload Leaflet
-        this.reloadLeaflet();
-        return;
-      }
-
-      // Check if window.L is available and use it if it is
-      if (
-        typeof window !== 'undefined' &&
-        window.L &&
-        typeof window.L.Map === 'function'
-      ) {
-        console.log('Using Leaflet from window object');
-        this.mapService.L = window.L as unknown as typeof import('leaflet');
-      }
-
-      console.log('Creating map instance...');
-
-      try {
-        // Clear any existing map instance
-        if (this.map) {
-          try {
-            this.map.remove();
-          } catch (e) {
-            console.error('Error removing existing map:', e);
-          }
-          this.map = undefined;
-        }
-
-        // Create the map with a default world view
-        this.map = new this.L.Map('map', {
-          // Add explicit options to ensure proper initialization
-          zoomControl: true,
-          attributionControl: true,
-          fadeAnimation: true,
-          zoomAnimation: true,
-          markerZoomAnimation: true,
-        }).setView([0, 0], 2);
-
-        console.log('Map instance created successfully');
-
-        // Add the OpenStreetMap tiles
-        this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap contributors',
-        }).addTo(this.map);
-
-        // Get user location and add markers
-        this.getUserLocation();
-
-        // Trigger change detection
-        this.cdr.markForCheck();
-      } catch (mapError) {
-        console.error('Error creating map instance:', mapError);
-
-        // Try one more approach - create with a delay and use window.L if available
-        setTimeout(() => {
-          try {
-            // Check if we're still in browser environment
-            if (!isPlatformBrowser(this.platformId)) return;
-
-            // Check if map container still exists
-            const mapContainer = document.getElementById('map');
-            if (!mapContainer) {
-              console.error('Map container not found after delay');
-              return;
-            }
-
-            // Use window.L if available
-            if (
-              typeof window !== 'undefined' &&
-              window.L &&
-              typeof window.L.Map === 'function'
-            ) {
-              console.log('Using Leaflet from window object after delay');
-              this.mapService.L =
-                window.L as unknown as typeof import('leaflet');
-            }
-
-            if (!this.L || !this.L.Map) {
-              console.error('Leaflet not available after delay');
-              return;
-            }
-
-            // Clear any existing map instance
-            if (this.map) {
-              try {
-                this.map.remove();
-              } catch (e) {
-                console.error('Error removing existing map:', e);
-              }
-              this.map = undefined;
-            }
-
-            console.log('Attempting to create map after delay...');
-            this.map = new this.L.Map('map', {
-              // Add explicit options to ensure proper initialization
-              zoomControl: true,
-              attributionControl: true,
-              fadeAnimation: true,
-              zoomAnimation: true,
-              markerZoomAnimation: true,
-            }).setView([0, 0], 2);
-
-            // Add the OpenStreetMap tiles
-            this.L.tileLayer(
-              'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap contributors',
-              },
-            ).addTo(this.map);
-
-            // Get user location and add markers
-            this.getUserLocation();
-
-            this.cdr.markForCheck();
-          } catch (delayedError) {
-            console.error('Error creating map after delay:', delayedError);
-          }
-        }, 1000);
-      }
-    } catch (error) {
-      console.error('Error initializing map:', error);
-      // Try to reload Leaflet on error
-      this.reloadLeaflet();
-    }
-  }
-
-  private getUserLocation(): void {
-    if (!this.L || !isPlatformBrowser(this.platformId)) return;
-
-    // Check if geolocation is available
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      // Request geolocation
-      navigator.geolocation.getCurrentPosition(
-        // Success callback
-        (position) => this.handleGeolocationSuccess(position),
-        // Error callback
-        (error) => this.handleGeolocationError(error),
-        // Options
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-      );
-    } else {
-      // Fallback to default location
-      this.useDefaultLocation();
-    }
-  }
-
   private handleGeolocationSuccess(position: GeolocationPosition): void {
-    if (!this.map || !this.L) return;
+    if (!this.map) return;
 
     const { latitude, longitude } = position.coords;
-
-    // Set map view to user location
-    this.map.setView([latitude, longitude], 13);
-
-    // Add user marker
-    this.L.marker([latitude, longitude])
-      .addTo(this.map)
-      .bindPopup(this.translate.instant('location.your_current_location'))
-      .openPopup();
 
     // Update location info
     this.updateLocationInfo(
@@ -433,153 +173,34 @@ export class HomeComponent implements AfterViewInit {
       this.translate.instant('location.current_location_description'),
     );
 
-    // Add random markers around user location
-    this.addRandomMarkers();
-
-    // Trigger change detection
-    this.cdr.markForCheck();
-  }
-
-  private handleGeolocationError(error: GeolocationPositionError): void {
-    console.error('Error getting user location:', error);
-    this.useDefaultLocation();
-  }
-
-  private async reloadLeaflet(): Promise<void> {
-    if (!isPlatformBrowser(this.platformId)) {
-      console.log('Not in browser environment, skipping Leaflet reload');
-      return;
-    }
-
-    console.log('Attempting to reload Leaflet...');
-
-    // Reset the map instance
-    if (this.map) {
-      try {
-        this.map.remove();
-      } catch (e) {
-        console.error('Error removing map:', e);
-      }
-      this.map = undefined;
-    }
-
-    try {
-      // Wait a bit before trying again
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Always treat Netlify as a special case
-      const isNetlify =
-        typeof window !== 'undefined' &&
-        (window.location?.hostname?.includes('netlify.app') ||
-          document.referrer?.includes('netlify.app'));
-
-      // Check if we're in a CSR environment (like Netlify)
-      const isCSR =
-        typeof window !== 'undefined' &&
-        (window.location?.pathname?.includes('index.csr.html') || isNetlify);
-
-      if (isCSR || isNetlify) {
-        console.log(
-          'Detected CSR/Netlify environment, using special loading approach',
+    // Add random markers around user location using the MapService
+    this.mapService.addRandomMarkers(
+      ['Park', 'Cafe', 'Museum', 'Library', 'Market'],
+      5,
+      (name, type, lat, lng) => {
+        // Update location info when marker is clicked
+        this.updateLocationInfo(
+          name,
+          this.translate.instant('location.near_your_location'),
+          [
+            {
+              label: this.translate.instant('location.details.type'),
+              value: type,
+            },
+            {
+              label: this.translate.instant('location.details.latitude'),
+              value: lat.toFixed(6),
+            },
+            {
+              label: this.translate.instant('location.details.longitude'),
+              value: lng.toFixed(6),
+            },
+          ],
+          `A ${type.toLowerCase()} located near your position.`,
         );
-
-        // First check if map container exists
-        const mapContainer = document.getElementById('map');
-        if (!mapContainer) {
-          console.error('Map container not found during reload');
-          return;
-        }
-
-        // In CSR mode, try to use window.L if available
-        if (window.L && typeof window.L.Map === 'function') {
-          console.log('Using Leaflet from window object in CSR mode');
-          this.mapService.L = window.L as unknown as typeof import('leaflet');
-
-          // Initialize map with window.L
-          console.log('Reinitializing map with window.L...');
-          this.initMap();
-          this.cdr.markForCheck();
-          return;
-        }
-
-        // If window.L is not available, try to load it globally
-        try {
-          console.log('Attempting to load Leaflet globally in CSR mode');
-
-          // First, add the CSS
-          if (!document.querySelector('link[href*="leaflet.css"]')) {
-            const cssLink = document.createElement('link');
-            cssLink.rel = 'stylesheet';
-            cssLink.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-            cssLink.integrity =
-              'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-            cssLink.crossOrigin = '';
-            document.head.appendChild(cssLink);
-          }
-
-          // Then load the JS
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          script.integrity =
-            'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
-          script.crossOrigin = '';
-          document.head.appendChild(script);
-
-          // Wait for script to load
-          await new Promise((resolve, reject) => {
-            script.onload = resolve;
-            script.onerror = reject;
-          });
-
-          // Check if Leaflet is now available on window
-          if (window.L && typeof window.L.Map === 'function') {
-            console.log('Leaflet loaded globally in CSR mode');
-            this.mapService.L = window.L as unknown as typeof import('leaflet');
-
-            // Initialize map with window.L
-            console.log('Reinitializing map with globally loaded Leaflet...');
-            this.initMap();
-            this.cdr.markForCheck();
-            return;
-          } else {
-            console.error(
-              'Leaflet loaded but Map constructor not available on window.L',
-            );
-          }
-        } catch (scriptError) {
-          console.error('Error loading Leaflet script globally:', scriptError);
-        }
-      }
-
-      // Standard approach for non-CSR environments
-      // Use the enhanced method to ensure Leaflet is fully loaded
-      const leaflet = await this.mapService.ensureLeafletLoaded();
-
-      if (!leaflet) {
-        console.error('Failed to reload Leaflet after multiple attempts');
-        return;
-      }
-
-      // Double-check Map constructor is available
-      if (!leaflet.Map) {
-        console.error('Leaflet Map constructor not available after reloading');
-        return;
-      }
-
-      console.log('Leaflet reloaded successfully, reinitializing map...');
-      this.initMap();
-      this.cdr.markForCheck();
-    } catch (error) {
-      console.error('Error reloading Leaflet:', error);
-    }
-  }
-
-  private useDefaultLocation(): void {
-    if (!this.map) return;
-
-    // Use London as default location
-    this.map.setView([51.505, -0.09], 13);
-    this.addRandomMarkers();
+      },
+    );
+    // Trigger change detection
     this.cdr.markForCheck();
   }
 
@@ -610,71 +231,6 @@ export class HomeComponent implements AfterViewInit {
 
     // Set default website URL
     this.websiteUrl.set('https://www.openstreetmap.org/about');
-  }
-
-  private addRandomMarkers(): void {
-    if (!this.map || !this.L) return;
-
-    // Clear existing markers
-    this.markers.forEach((marker) => marker.remove());
-    this.markers = [];
-
-    // Get map center
-    const center = this.map.getCenter();
-    const lat = center.lat;
-    const lng = center.lng;
-
-    // Simple location types
-    const locationTypes = ['Park', 'Cafe', 'Museum', 'Library', 'Market'];
-
-    // Add markers
-    for (let i = 0; i < 5; i++) {
-      // Generate random position (within ~2km)
-      const latOffset = (Math.random() - 0.5) * 0.04;
-      const lngOffset = (Math.random() - 0.5) * 0.04;
-      const markerLat = lat + latOffset;
-      const markerLng = lng + lngOffset;
-
-      // Create marker name and details
-      const locationType = locationTypes[i];
-      const markerName = `${locationType} ${i + 1}`;
-
-      // Create marker details
-      const details = [
-        {
-          label: this.translate.instant('location.details.type'),
-          value: locationType,
-        },
-        {
-          label: this.translate.instant('location.details.latitude'),
-          value: markerLat.toFixed(6),
-        },
-        {
-          label: this.translate.instant('location.details.longitude'),
-          value: markerLng.toFixed(6),
-        },
-      ];
-
-      // Create and add marker
-      const marker = this.L.marker([markerLat, markerLng])
-        .addTo(this.map)
-        .bindPopup(markerName);
-
-      // Add click handler
-      marker.on('click', () => {
-        this.updateLocationInfo(
-          markerName,
-          this.translate.instant('location.near_your_location'),
-          details,
-          `A ${locationType.toLowerCase()} located near your position.`,
-        );
-      });
-
-      this.markers.push(marker);
-    }
-
-    // Trigger change detection
-    this.cdr.markForCheck();
   }
 
   protected onScroll({ clientHeight, scrollTop }: HTMLElement): void {
