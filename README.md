@@ -9,7 +9,9 @@ Base project for Web Applications:
 - [Tailwind 4](https://tailwindcss.com/)
 - ESLINT
 
-With love, by Gabri Mejía
+With love, by Gabri Mejía ❤
+
+[Live DEMO](https://angular-app-template.netlify.app/home) 🚀
 
 ## Development server
 
