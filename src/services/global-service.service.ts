@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
 import { TuiFlagPipe } from '@taiga-ui/core';
 import { TranslateService } from '@ngx-translate/core';
 import { LocalStorageService } from './local-storage.service';
+import { TUI_ENGLISH_LANGUAGE, TUI_SPANISH_LANGUAGE } from '@taiga-ui/i18n';
 
 interface User {
   name: string;
@@ -48,6 +49,11 @@ export class GlobalServiceService {
 
   selectedLanguage: WritableSignal<string> = signal('es');
   selectedTheme: WritableSignal<'light' | 'dark'> = signal('light');
+
+  // Computed signal for Taiga UI language based on selectedLanguage
+  tuiLanguage: Signal<typeof TUI_SPANISH_LANGUAGE | typeof TUI_ENGLISH_LANGUAGE> = computed(() =>
+    this.selectedLanguage() === 'es' ? TUI_SPANISH_LANGUAGE : TUI_ENGLISH_LANGUAGE
+  );
 
   drawer: WritableSignal<OptionsData> = signal({
     Navigation: [

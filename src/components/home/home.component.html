@@ -9,59 +9,60 @@
   } @placeholder {
     <tui-loader [overlay]="true" [size]="'xxl'" class="w-full h-full flex" />
   }
-  <div
-    #buttons
-    class="absolute bottom-32 w-full max-w-[40rem] flex gap-4 px-4 md:px-0 items-center justify-end place-self-center z-50"
-  >
-    <a
-      appearance="floating"
-      [href]="mapUrl()"
-      iconStart="@tui.map-pin"
-      rel="noopener noreferrer"
-      size="m"
-      target="_blank"
-      tuiIconButton
-      aria-label="Open location in Google Maps"
+  @if (showBottomSheet()) {
+    <div
+      #buttons
+      class="absolute bottom-32 w-full max-w-[40rem] flex gap-4 px-4 md:px-0 items-center justify-end place-self-center z-50 pointer-events-none"
     >
-      Map
-    </a>
-    @if (websiteUrl()) {
       <a
         appearance="floating"
-        [href]="websiteUrl()"
-        iconStart="@tui.external-link"
+        [href]="mapUrl()"
+        iconStart="@tui.map-pin"
         rel="noopener noreferrer"
         size="m"
         target="_blank"
         tuiIconButton
-        aria-label="Visit related website for this location"
+        class="pointer-events-auto"
+        aria-label="Open location in Google Maps"
       >
-        Website
+        Map
       </a>
-    }
-  </div>
-  <tui-bottom-sheet
-    [stops]="stops"
-    (scroll.zoneless)="onScroll($any($event.target))"
-    role="dialog"
-    aria-labelledby="location-info-title"
-  >
-    <h3 tuiHeader id="location-info-title">
-      <span tuiTitle>
-        {{ locationName() }}
-        @if (locationRegion()) {
-          <span tuiSubtitle>{{ locationRegion() }}</span>
-        }
-      </span>
-    </h3>
-    <div class="flex flex-col gap-4 my-4">
-      @for (detail of locationDetails(); track detail.label) {
-        <div tuiTitle>
-          <strong>{{ detail.label }}</strong>
-          <span tuiSubtitle>{{ detail.value }}</span>
-        </div>
+      @if (websiteUrl()) {
+        <a
+          appearance="floating"
+          [href]="websiteUrl()"
+          iconStart="@tui.external-link"
+          rel="noopener noreferrer"
+          size="m"
+          target="_blank"
+          tuiIconButton
+          class="pointer-events-auto"
+          aria-label="Visit related website for this location"
+        >
+          Website
+        </a>
       }
     </div>
-    {{ locationDescription() }}
-  </tui-bottom-sheet>
+    <tui-bottom-sheet
+      [stops]="stops"
+      (scroll.zoneless)="onScroll(handleScrollEvent($event.target))"
+      role="dialog"
+      aria-labelledby="location-info-title"
+    >
+      <h3 tuiHeader id="location-info-title">
+        <span tuiTitle>
+          {{ locationName() }}
+        </span>
+      </h3>
+      <div class="flex flex-col gap-4 my-4">
+        @for (detail of locationDetails(); track detail.label) {
+          <div tuiTitle>
+            <strong>{{ detail.label }}</strong>
+            <span tuiSubtitle>{{ detail.value }}</span>
+          </div>
+        }
+      </div>
+      {{ locationDescription() }}
+    </tui-bottom-sheet>
+  }
 </div>

@@ -7,11 +7,16 @@ import { Observable, of } from 'rxjs';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 
+// Define interface for translation data
+interface TranslationData {
+  [key: string]: string | TranslationData;
+}
+
 // Custom TranslateLoader for SSR that loads translations from filesystem
 export class TranslateServerLoader implements TranslateLoader {
   constructor(private prefix: string = 'i18n', private suffix: string = '.json') {}
 
-  getTranslation(lang: string): Observable<any> {
+  getTranslation(lang: string): Observable<TranslationData> {
     try {
       // During SSR, we need to load the translations from the filesystem
       const path = join(process.cwd(), 'public', this.prefix, `${lang}${this.suffix}`);

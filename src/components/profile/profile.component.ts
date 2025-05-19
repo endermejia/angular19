@@ -3,14 +3,12 @@ import {
   Component,
 } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
-import { TuiTitle } from '@taiga-ui/core';
-import { TuiHeader } from '@taiga-ui/layout';
 import { TuiAvatar } from '@taiga-ui/kit';
 import { GlobalServiceService } from '../../services';
 
 @Component({
   selector: 'app-profile',
-  imports: [TuiTitle, TuiHeader, TuiAvatar, TranslatePipe],
+  imports: [TuiAvatar, TranslatePipe],
   templateUrl: './profile.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {

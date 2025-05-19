@@ -2,7 +2,7 @@ import {
   ApplicationConfig,
   provideExperimentalZonelessChangeDetection,
 } from '@angular/core';
-import { HttpClient, provideHttpClient } from '@angular/common/http';
+import { HttpClient, provideHttpClient, withFetch } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import {
@@ -12,8 +12,9 @@ import {
 import { provideTranslateService, TranslateLoader } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { NG_EVENT_PLUGINS } from '@taiga-ui/event-plugins';
-import { TUI_LANGUAGE, TUI_SPANISH_LANGUAGE } from '@taiga-ui/i18n';
-import { of } from 'rxjs';
+import { TUI_LANGUAGE } from '@taiga-ui/i18n';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { GlobalServiceService } from '../services/global-service.service';
 
 import { routes } from './app.routes';
 
@@ -26,7 +27,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimations(),
     provideExperimentalZonelessChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(),
+    provideHttpClient(withFetch()),
     provideClientHydration(withEventReplay()),
     provideTranslateService({
       loader: {
@@ -39,7 +40,10 @@ export const appConfig: ApplicationConfig = {
     NG_EVENT_PLUGINS,
     {
       provide: TUI_LANGUAGE,
-      useValue: of(TUI_SPANISH_LANGUAGE),
+      useFactory: (globalService: GlobalServiceService) => {
+        return toObservable(globalService.tuiLanguage);
+      },
+      deps: [GlobalServiceService],
     },
   ],
 };

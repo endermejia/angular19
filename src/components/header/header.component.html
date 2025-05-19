@@ -1,23 +1,25 @@
-<header tuiNavigationHeader class="flex items-center justify-between sm:gap-4">
-  <div class="flex items-center gap-2">
+<header tuiNavigationHeader class="flex items-center justify-between sm:gap-4" ngSkipHydration>
+  <div class="flex items-center gap-2" ngSkipHydration>
     <button
       title="{{ 'Menu' | translate }}"
       tuiIconButton
       tuiNavigationDrawer
       type="button"
       [(open)]="open"
+      ngSkipHydration
     >
-      <tui-data-list>
+      <tui-data-list ngSkipHydration>
         @for (group of globalService.drawer() | keyvalue; track group.key) {
-          <tui-opt-group [label]="group.key | translate">
+          <tui-opt-group [label]="group.key | translate" ngSkipHydration>
             @for (item of group.value; track item.name) {
               <button
                 tuiOption
                 type="button"
                 (click)="onClick(item); open = false"
                 class="gap-2"
+                ngSkipHydration
               >
-                <tui-avatar [src]="item.icon || '@tui.file'" />
+                <tui-avatar [src]="item.icon || '@tui.file'" ngSkipHydration />
                 {{ item.name | translate }}
               </button>
             }
@@ -25,12 +27,12 @@
         }
       </tui-data-list>
     </button>
-    <strong class="hidden sm:block">{{
+    <strong class="hidden sm:block" ngSkipHydration>{{
       globalService.headerTitle() | translate
     }}</strong>
   </div>
-  <div class="flex items-center gap-2 sm:gap-4">
-    <tui-textfield class="!m-0">
+  <div class="flex items-center gap-2 sm:gap-4" ngSkipHydration>
+    <tui-textfield class="!m-0" ngSkipHydration>
       <input
         tuiSearchHotkey
         [formControl]="control"
@@ -38,14 +40,14 @@
         ngSkipHydration
       />
       <ng-template #search>
-        <tui-search-results [results]="results$ | async">
-          <tui-search-history [popular]="globalService.searchPopular()" />
+        <tui-search-results [results]="results$ | async" ngSkipHydration>
+          <tui-search-history [popular]="globalService.searchPopular()" ngSkipHydration />
           <ng-template let-item>
-            <a tuiCell [href]="item.href">
-              <tui-avatar [src]="item.icon || '@tui.file'" />
-              <span tuiTitle>
+            <a tuiCell [href]="item.href" ngSkipHydration>
+              <tui-avatar [src]="item.icon || '@tui.file'" ngSkipHydration />
+              <span tuiTitle ngSkipHydration>
                 {{ item.title }}
-                <span tuiSubtitle>{{ item.subtitle }}</span>
+                <span tuiSubtitle ngSkipHydration>{{ item.subtitle }}</span>
               </span>
             </a>
           </ng-template>
@@ -57,19 +59,20 @@
       tuiDropdownOpen
       type="button"
       class="flex justify-center items-center gap-2"
+      ngSkipHydration
     >
-      <span class="hidden sm:block">{{ globalService.user().name }}</span>
-      <tui-avatar [src]="globalService.user().picture" />
+      <span class="hidden sm:block" ngSkipHydration>{{ globalService.user().name }}</span>
+      <tui-avatar [src]="globalService.user().picture" ngSkipHydration />
     </button>
   </div>
 </header>
 <ng-template #content>
-  <tui-data-list role="menu">
+  <tui-data-list role="menu" ngSkipHydration>
     @for (group of globalService.settings() | keyvalue; track group.key) {
-      <tui-opt-group [label]="group.key | translate">
+      <tui-opt-group [label]="group.key | translate" ngSkipHydration>
         @for (item of group.value; track item.name) {
-          <button tuiOption type="button" (click)="onClick(item)" class="gap-2">
-            <tui-avatar [src]="item.icon || '@tui.file'" />
+          <button tuiOption type="button" (click)="onClick(item)" class="gap-2" ngSkipHydration>
+            <tui-avatar [src]="item.icon || '@tui.file'" ngSkipHydration />
             {{ item.name | translate }}
           </button>
         }

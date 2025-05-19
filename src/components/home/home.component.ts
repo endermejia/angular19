@@ -15,16 +15,22 @@ import { TuiBottomSheet } from '@taiga-ui/addon-mobile';
 import { TuiButton, TuiLoader, TuiTitle } from '@taiga-ui/core';
 import { TuiHeader } from '@taiga-ui/layout';
 import { TranslateService } from '@ngx-translate/core';
-import { MapService } from '../../services';
+import { MapService, WeatherService, WeatherData } from '../../services';
 // Import types only, not the actual library
 import type * as L from 'leaflet';
+
+// Define interface for scroll event target
+interface ScrollEventTarget {
+  clientHeight: number;
+  scrollTop: number;
+}
 
 @Component({
   selector: 'app-home',
   imports: [TuiBottomSheet, TuiButton, TuiTitle, TuiHeader, TuiLoader],
   templateUrl: './home.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [MapService],
+  providers: [MapService, WeatherService],
   host: {
     class: 'flex grow',
   },
@@ -35,24 +41,23 @@ export class HomeComponent implements AfterViewInit {
   protected readonly stops = ['112px'] as const;
 
   // Properties for the bottom-sheet content using signals
-  protected locationName: WritableSignal<string> = signal('Your Location');
-  protected locationRegion: WritableSignal<string> = signal('');
+  protected locationName: WritableSignal<string> = signal('');
   protected locationDetails: WritableSignal<
     { label: string; value: string }[]
   > = signal([]);
-  protected locationDescription: WritableSignal<string> = signal(
-    'Click on a marker to see information about the location.',
-  );
-  protected mapUrl: WritableSignal<string> = signal(
-    'https://www.google.com/maps',
-  );
+  protected locationDescription: WritableSignal<string> = signal('');
+  protected mapUrl: WritableSignal<string> = signal('');
   protected websiteUrl: WritableSignal<string> = signal('');
+
+  // Signal to control the visibility of the bottom-sheet and buttons
+  protected showBottomSheet: WritableSignal<boolean> = signal(false);
 
   private map?: L.Map;
   private readonly platformId = inject(PLATFORM_ID);
   private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly mapService = inject(MapService);
+  private readonly weatherService = inject(WeatherService);
 
   ngAfterViewInit(): void {
     // Only proceed in browser environment
@@ -115,12 +120,15 @@ export class HomeComponent implements AfterViewInit {
         return;
       }
 
-      // Get user location and add markers
-      this.mapService.getUserLocation(
-        // Success callback
-        (position) => this.handleGeolocationSuccess(position),
-        // Error callback
-        () => this.mapService.useDefaultLocation(),
+      // Set default location (Spain)
+      this.mapService.useDefaultLocation();
+
+      // Add weather markers based on zoom level
+      this.addWeatherMarkers();
+
+      // Set up map change event handler (zoom and pan)
+      this.mapService.updateMarkersOnMapChange((weatherData) =>
+        this.handleWeatherMarkerClick(weatherData),
       );
 
       // Trigger change detection
@@ -151,55 +159,59 @@ export class HomeComponent implements AfterViewInit {
     }
   }
 
-  private handleGeolocationSuccess(position: GeolocationPosition): void {
-    if (!this.map) return;
+  /**
+   * Adds weather markers to the map
+   */
+  private addWeatherMarkers(): void {
+    this.mapService.addWeatherMarkers((weatherData) =>
+      this.handleWeatherMarkerClick(weatherData),
+    );
+  }
 
-    const { latitude, longitude } = position.coords;
+  /**
+   * Handles click events on weather markers
+   * @param weatherData The weather data for the clicked location
+   */
+  private handleWeatherMarkerClick(weatherData: WeatherData): void {
+    if (!weatherData) return;
 
-    // Update location info
+    console.log(
+      'Marker clicked, updating bottom-sheet with weather data:',
+      weatherData,
+    );
+
+    // Update location info with weather data
     this.updateLocationInfo(
-      this.translate.instant('location.your_location'),
-      this.translate.instant('location.current_position'),
+      weatherData.location.name,
       [
         {
-          label: this.translate.instant('location.details.latitude'),
-          value: latitude.toFixed(6),
+          label: this.translate.instant('location.details.temperature'),
+          value: `${weatherData.temperature}°C`,
         },
         {
-          label: this.translate.instant('location.details.longitude'),
-          value: longitude.toFixed(6),
+          label: this.translate.instant('location.details.description'),
+          value: weatherData.description,
+        },
+        {
+          label: this.translate.instant('location.details.humidity'),
+          value: `${weatherData.humidity}%`,
+        },
+        {
+          label: this.translate.instant('location.details.wind'),
+          value: `${weatherData.windSpeed} km/h`,
         },
       ],
-      this.translate.instant('location.current_location_description'),
+      `${weatherData.description} en ${weatherData.location.name} con una temperatura de ${weatherData.temperature}°C.`,
     );
 
-    // Add random markers around user location using the MapService
-    this.mapService.addRandomMarkers(
-      ['Park', 'Cafe', 'Museum', 'Library', 'Market'],
-      5,
-      (name, type, lat, lng) => {
-        // Update location info when marker is clicked
-        this.updateLocationInfo(
-          name,
-          this.translate.instant('location.near_your_location'),
-          [
-            {
-              label: this.translate.instant('location.details.type'),
-              value: type,
-            },
-            {
-              label: this.translate.instant('location.details.latitude'),
-              value: lat.toFixed(6),
-            },
-            {
-              label: this.translate.instant('location.details.longitude'),
-              value: lng.toFixed(6),
-            },
-          ],
-          `A ${type.toLowerCase()} located near your position.`,
-        );
-      },
+    // Set map URL for Google Maps
+    this.mapUrl.set(
+      `https://www.google.com/maps/search/?api=1&query=${weatherData.location.latitude},${weatherData.location.longitude}`,
     );
+
+    // Show the bottom-sheet and buttons
+    this.showBottomSheet.set(true);
+
     // Trigger change detection
     this.cdr.markForCheck();
   }
@@ -207,13 +219,11 @@ export class HomeComponent implements AfterViewInit {
   // Helper method to update location info in the bottom-sheet
   private updateLocationInfo(
     name: string,
-    region: string,
     details: { label: string; value: string }[],
     description: string,
   ): void {
     // Update signals with new values
     this.locationName.set(name);
-    this.locationRegion.set(region);
     this.locationDetails.set(details);
     this.locationDescription.set(description);
 
@@ -233,7 +243,20 @@ export class HomeComponent implements AfterViewInit {
     this.websiteUrl.set('https://www.openstreetmap.org/about');
   }
 
-  protected onScroll({ clientHeight, scrollTop }: HTMLElement): void {
+  /**
+   * Handles the event target from scroll events
+   * @param target The event target to be cast to ScrollEventTarget
+   * @returns The event target as ScrollEventTarget
+   */
+  protected handleScrollEvent(target: EventTarget | null): ScrollEventTarget {
+    return target as unknown as ScrollEventTarget;
+  }
+
+  /**
+   * Handles scroll events from the bottom sheet
+   * @param target The scroll event target with clientHeight and scrollTop properties
+   */
+  protected onScroll({ clientHeight, scrollTop }: ScrollEventTarget): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
     const offset = Number.parseInt(this.stops[0], 10);
