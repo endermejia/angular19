@@ -15,6 +15,8 @@ export interface WeatherLocation {
   name: string;
   latitude: number;
   longitude: number;
+  capital: number;
+  place?: string;
 }
 
 export interface WeatherData {
@@ -92,7 +94,6 @@ export class WeatherService {
   constructor() {
     this.isBrowser = isPlatformBrowser(this.platformId);
   }
-
 
   /**
    * Gets weather data for a specific location
