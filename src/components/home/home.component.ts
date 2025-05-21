@@ -15,7 +15,7 @@ import { TuiBottomSheet } from '@taiga-ui/addon-mobile';
 import { TuiButton, TuiLoader, TuiTitle } from '@taiga-ui/core';
 import { TuiHeader } from '@taiga-ui/layout';
 import { TranslateService } from '@ngx-translate/core';
-import { MapService, WeatherService, WeatherData } from '../../services';
+import { MapService, WeatherData } from '../../services';
 // Import types only, not the actual library
 import type * as L from 'leaflet';
 
@@ -30,7 +30,7 @@ interface ScrollEventTarget {
   imports: [TuiBottomSheet, TuiButton, TuiTitle, TuiHeader, TuiLoader],
   templateUrl: './home.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [MapService, WeatherService],
+  providers: [MapService],
   host: {
     class: 'flex grow',
   },
@@ -57,10 +57,9 @@ export class HomeComponent implements AfterViewInit {
   private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly mapService = inject(MapService);
-  private readonly weatherService = inject(WeatherService);
 
   ngAfterViewInit(): void {
-    // Only proceed in browser environment
+    // Only proceed in the browser environment
     if (!isPlatformBrowser(this.platformId)) {
       console.log('Not in browser environment, skipping map initialization');
       return;
@@ -74,7 +73,7 @@ export class HomeComponent implements AfterViewInit {
   }
 
   private async initializeMap(retryCount = 0): Promise<void> {
-    // Only proceed in browser environment
+    // Only proceed in the browser environment
     if (!isPlatformBrowser(this.platformId)) {
       console.log('Not in browser environment, skipping map initialization');
       return;
@@ -123,10 +122,10 @@ export class HomeComponent implements AfterViewInit {
       // Set default location (Spain)
       this.mapService.useDefaultLocation();
 
-      // Add weather markers based on zoom level
+      // Add weather markers based on the zoom level
       this.addWeatherMarkers();
 
-      // Set up map change event handler (zoom and pan)
+      // Set up the map change event handler (zoom and pan)
       this.mapService.updateMarkersOnMapChange((weatherData) =>
         this.handleWeatherMarkerClick(weatherData),
       );

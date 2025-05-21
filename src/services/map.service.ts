@@ -1,9 +1,13 @@
 import { Inject, inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-// Import type only, not the actual library
 import type * as L from 'leaflet';
-// Define interface for MarkerClusterGroup instead of importing the type
-// This avoids the TS2307 error while still providing type safety
+import { debounceTime, Observable, of, Subject } from 'rxjs';
+import {
+  WeatherData,
+  WeatherLocation,
+  WeatherService,
+} from './weather.service';
+
 interface MarkerClusterGroupInterface {
   addLayer: (layer: L.Layer) => this;
   addLayers: (layers: L.Layer[]) => this;
@@ -13,16 +17,14 @@ interface MarkerClusterGroupInterface {
   addTo: (map: L.Map) => this;
 }
 
-// Define option interface for MarkerClusterGroup
 interface MarkerClusterGroupOptions {
   showCoverageOnHover?: boolean;
   maxClusterRadius?: number;
   spiderfyOnMaxZoom?: boolean;
   disableClusteringAtZoom?: number;
-  [key: string]: unknown; // For any other options that might be used
+  [key: string]: unknown;
 }
 
-// Define interfaces for Overpass API
 interface OverpassElement {
   id: number;
   tags?: {
@@ -40,19 +42,12 @@ interface OverpassElement {
 
 interface OverpassResponse {
   elements: OverpassElement[];
-  [key: string]: unknown; // For any other properties in the response
+  [key: string]: unknown;
 }
 
-// Define constructor interface
 type MarkerClusterGroupStatic = new (
   options?: MarkerClusterGroupOptions,
 ) => MarkerClusterGroupInterface;
-import { Observable, Subject, debounceTime, of } from 'rxjs';
-import {
-  WeatherData,
-  WeatherLocation,
-  WeatherService,
-} from './weather.service';
 
 @Injectable()
 export class MapService {
@@ -70,12 +65,6 @@ export class MapService {
   private markersAddedDuringInit = false;
   private isInitializing = false;
 
-  // Cache for storing location results
-  private locationCache = new Map<string, WeatherLocation[]>();
-
-  // Track in-flight requests to prevent duplicates
-  private inFlightRequests = new Set<string>();
-
   // Debouncing for map movement
   private mapMoveSubject = new Subject<{
     north: number;
@@ -89,10 +78,7 @@ export class MapService {
   private markerClickCallback?: (weatherData: WeatherData) => void;
 
   // Track the current zoom level to detect zoom changes
-  private currentZoomLevel?: number;
-
-  // Track locations that already have markers
-  private displayedLocationIds = new Set<string>();
+  private currentZoomLevel = 6;
 
   constructor(@Inject(PLATFORM_ID) private platformId: object) {
     // Don't load Leaflet in the constructor - wait for an explicit request
@@ -117,13 +103,8 @@ export class MapService {
               console.log('Zoom change detected, refreshing all markers');
               this.fetchLocationsFromOverpass(bounds).subscribe({
                 next: (locations: WeatherLocation[]) => {
-                  // Store the result in the cache
-                  const cacheKey = this.getBoundsCacheKey(bounds);
-                  this.locationCache.set(cacheKey, locations);
-
                   // Clear all existing markers and add new ones
                   this.clearMarkers(true); // true = clear all markers
-                  this.displayedLocationIds.clear();
                   this.addMarkersForLocations(
                     locations,
                     this.markerClickCallback,
@@ -143,22 +124,13 @@ export class MapService {
 
               this.fetchLocationsFromOverpass(bounds).subscribe({
                 next: (locations: WeatherLocation[]) => {
-                  // Store the result in the cache
-                  const cacheKey = this.getBoundsCacheKey(bounds);
-                  this.locationCache.set(cacheKey, locations);
-
-                  // Filter out locations that already have markers
-                  const newLocations = locations.filter(
-                    (location) => !this.displayedLocationIds.has(location.id),
-                  );
-
                   console.log(
-                    `Found ${newLocations.length} new locations to add markers for`,
+                    `Found ${locations.length} new locations to add markers for`,
                   );
 
                   // Add markers only for new locations
                   this.addMarkersForLocations(
-                    newLocations,
+                    locations,
                     this.markerClickCallback,
                   );
                 },
@@ -388,8 +360,7 @@ export class MapService {
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
           {
             maxZoom: 19,
-            attribution:
-              'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+            attribution: 'by Gabri Mejía with ❤️',
           },
         ).addTo(this.map);
 
@@ -448,19 +419,11 @@ export class MapService {
     // Ensure isZoomChange is defined
     const boundsWithZoomFlag = {
       ...bounds,
-      isZoomChange:
-        bounds.isZoomChange !== undefined ? bounds.isZoomChange : false,
+      isZoomChange: bounds.isZoomChange ?? false,
     };
 
     // Trigger the debounced map movement subject
     this.mapMoveSubject.next(boundsWithZoomFlag);
-
-    // Check if we have cached results for these bounds
-    const cacheKey = this.getBoundsCacheKey(bounds);
-    if (this.locationCache.has(cacheKey)) {
-      console.log('Returning cached locations for bounds:', bounds);
-      return of(this.locationCache.get(cacheKey) || []);
-    }
 
     // If we're in the initialization phase and markers have already been added,
     // return an empty array to prevent redundant API calls
@@ -514,7 +477,6 @@ export class MapService {
 
     // Clear markers without resetting the initialization flags
     this.clearMarkersWithoutResetFlags();
-    this.displayedLocationIds.clear();
 
     // Get the current map bounds (with error handling)
     let bounds;
@@ -577,14 +539,7 @@ export class MapService {
 
     // For each location, get weather data and create a marker
     locations.forEach((location: WeatherLocation) => {
-      // Skip if we already have a marker for this location
-      if (this.displayedLocationIds.has(location.id)) {
-        return;
-      }
-
-      // Add to displayed locations set
-      this.displayedLocationIds.add(location.id);
-
+      // Only add to displayedLocationIds after successfully creating the marker
       this.weatherService.getWeatherForLocation(location).subscribe({
         next: (weatherData: WeatherData | null) => {
           if (!weatherData) return;
@@ -594,8 +549,6 @@ export class MapService {
         },
         error: (error: Error) => {
           console.error(`Error fetching weather for ${location.name}:`, error);
-          // Remove from displayed locations if we couldn't get weather data
-          this.displayedLocationIds.delete(location.id);
         },
       });
     });
@@ -605,21 +558,24 @@ export class MapService {
    * Creates a weather marker for the given weather data
    * @param weatherData The weather data for the location
    * @param onMarkerClick Callback function to execute when the marker is clicked
+   * @returns boolean indicating if the marker was successfully created and added
    */
   private createWeatherMarker(
     weatherData: WeatherData,
     onMarkerClick?: (weatherData: WeatherData) => void,
-  ): void {
-    if (!this.map || !this.L) return;
+  ): boolean {
+    if (!this.map || !this.L) return false;
 
     try {
       // Create a custom icon based on the weather description
       const icon = this.createWeatherIcon(weatherData.icon);
 
-      // Create the marker
+      // Create the marker with custom data
       const marker = new this.L.Marker(
         [weatherData.location.latitude, weatherData.location.longitude],
-        { icon },
+        {
+          icon,
+        },
       );
 
       // Add a popup with basic weather info
@@ -651,8 +607,11 @@ export class MapService {
 
       // Store the marker in our array for later reference
       this.markers.push(marker);
+
+      return true;
     } catch (error) {
       console.error('Error creating weather marker:', error);
+      return false;
     }
   }
 
@@ -827,9 +786,6 @@ export class MapService {
       // Use the common method to clear all markers
       this.clearAllMarkersInternal();
 
-      // Clear the displayed location IDs
-      this.displayedLocationIds.clear();
-
       // Reset the initialization flags to allow markers to be added again
       this.markersAddedDuringInit = false;
       this.isInitializing = false;
@@ -840,31 +796,12 @@ export class MapService {
         if (bounds) {
           // Filter markers that are out of bounds
           const markersToRemove: L.Marker[] = [];
-          const locationIdsToRemove: string[] = [];
 
           // Check each marker to see if it's still in bounds
           this.markers.forEach((marker: L.Marker) => {
             const latLng = marker.getLatLng();
             if (!bounds.contains(latLng)) {
               markersToRemove.push(marker);
-
-              // Find the location ID for this marker
-              // This is a bit tricky since we don't store the ID with the marker
-              // We'll need to extract it from the popup content or other properties
-              const popupContent = marker.getPopup()?.getContent();
-              if (typeof popupContent === 'string') {
-                // Extract location name from popup content
-                const match = popupContent.match(/<b>(.*?)<\/b>/);
-                if (match && match[1]) {
-                  // Find the location ID with this name
-                  this.displayedLocationIds.forEach((id) => {
-                    // This is a simplistic approach - in a real app, you'd want a more reliable way to link markers to location IDs
-                    if (popupContent.includes(id)) {
-                      locationIdsToRemove.push(id);
-                    }
-                  });
-                }
-              }
             }
           });
 
@@ -889,11 +826,6 @@ export class MapService {
             } catch (e: unknown) {
               console.warn('Error removing out-of-bounds marker:', e);
             }
-          });
-
-          // Remove location IDs for markers that were removed
-          locationIdsToRemove.forEach((id) => {
-            this.displayedLocationIds.delete(id);
           });
 
           console.log(
@@ -1019,21 +951,6 @@ export class MapService {
   }
 
   /**
-   * Creates a cache key from map bounds
-   * @param bounds The bounds of the map
-   * @returns A string key for caching
-   */
-  private getBoundsCacheKey(bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  }): string {
-    // Round to 2 decimal places to create a reasonable cache grid
-    return `${bounds.north.toFixed(2)},${bounds.south.toFixed(2)},${bounds.east.toFixed(2)},${bounds.west.toFixed(2)}`;
-  }
-
-  /**
    * Fetches locations from Overpass API
    * @param bounds The bounds of the map
    * @returns An Observable of WeatherLocation array
@@ -1054,28 +971,11 @@ export class MapService {
     );
     console.log(`Call stack: ${new Error().stack}`);
 
-    // Check if we have cached results for these bounds
-    const cacheKey = this.getBoundsCacheKey(bounds);
-    if (this.locationCache.has(cacheKey)) {
-      console.log('Using cached locations for bounds:', bounds);
-      return of(this.locationCache.get(cacheKey) || []);
-    }
-
-    // Check if this request is already in flight
-    if (this.inFlightRequests.has(cacheKey)) {
-      console.log('Request already in flight for bounds:', bounds);
-      return of([]); // Return an empty array to prevent redundant API calls
-    }
-
-    // Add this request to the in-flight set
-    this.inFlightRequests.add(cacheKey);
-    console.log('Fetching locations from Overpass API for bounds:', bounds);
-
     return new Observable<WeatherLocation[]>((observer) => {
       // Construct the Overpass API query
       const overpassQuery = `[out:json];
         (
-          node["place"="city"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
+          node["place"~"^(city|town)$"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
         );
         out center;`;
 
@@ -1103,7 +1003,8 @@ export class MapService {
           const allLocations: WeatherLocation[] = data.elements
             .filter(
               (element: OverpassElement) =>
-                element && element.tags && element.tags.place === 'city',
+                element?.tags?.place &&
+                (this.currentZoomLevel > 8 || element.tags.place === 'city'),
             )
             .map(
               (element: OverpassElement): WeatherLocation => ({
@@ -1124,7 +1025,8 @@ export class MapService {
               (location: WeatherLocation) =>
                 location.latitude !== 0 &&
                 location.longitude !== 0 &&
-                location.name !== 'Unknown',
+                location.name !== 'Unknown' &&
+                location.capital <= (this.currentZoomLevel || 9),
             )
             .sort(
               (locationA: WeatherLocation, locationB: WeatherLocation) =>
@@ -1132,47 +1034,14 @@ export class MapService {
             );
           console.log(
             `Found ${allLocations.length} total locations from Overpass API`,
+            allLocations,
           );
 
-          // Prioritize and limit locations to the most relevant ones
-          const MAX_LOCATIONS = 25; // Limit to a reasonable number
-
-          // Filter out locations that already exist in the cache
-          const existingLocations = new Set<string>();
-          this.locationCache.forEach((locations) => {
-            locations.forEach((loc) => existingLocations.add(loc.id));
-          });
-
-          const newLocations = allLocations.filter(
-            (loc) => !existingLocations.has(loc.id),
-          );
-
-          // Limit to MAX_LOCATIONS
-          const prioritizedLocations: WeatherLocation[] = newLocations.slice(
-            0,
-            MAX_LOCATIONS,
-          );
-
-          console.log(
-            `Returning ${prioritizedLocations.length} most relevant locations`,
-            prioritizedLocations,
-          );
-
-          // Store the result in the cache
-          this.locationCache.set(cacheKey, prioritizedLocations);
-
-          // Remove this request from the in-flight set
-          this.inFlightRequests.delete(cacheKey);
-
-          observer.next(prioritizedLocations);
+          observer.next(allLocations);
           observer.complete();
         })
         .catch((error: Error) => {
           console.error('Error fetching from Overpass API:', error);
-
-          // Remove this request from the in-flight set even on error
-          this.inFlightRequests.delete(cacheKey);
-
           observer.error(error);
         });
     });
