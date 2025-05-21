@@ -1,7 +1,7 @@
 import { Inject, inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import type * as L from 'leaflet';
-import { debounceTime, Observable, of, Subject } from 'rxjs';
+import { debounceTime, Observable, of, Subject, switchMap } from 'rxjs';
 import {
   WeatherData,
   WeatherLocation,
@@ -61,6 +61,12 @@ export class MapService {
   private markerClusterGroup?: MarkerClusterGroupInterface;
   private weatherService = inject(WeatherService);
 
+  // Set to track location IDs that already have markers
+  private markerLocationIds = new Set<string>();
+
+  // Map to associate markers with their location IDs
+  private markerToLocationId = new Map<L.Marker, string>();
+
   // Flags to track initialization state
   private markersAddedDuringInit = false;
   private isInitializing = false;
@@ -88,59 +94,44 @@ export class MapService {
       this.mapMoveSubject
         .pipe(
           debounceTime(500), // 500ms debounce time
+          switchMap(
+            (bounds: {
+              north: number;
+              south: number;
+              east: number;
+              west: number;
+              isZoomChange: boolean;
+            }) => {
+              // If it's a zoom change, we need to refresh all markers
+              // If it's just a pan, we only need to fetch new locations
+              if (bounds.isZoomChange) {
+                console.log('Zoom change detected, refreshing all markers');
+                // Clear all existing markers before fetching new ones
+                this.clearMarkers(true); // true = clear all markers
+                return this.fetchLocationsFromOverpass(bounds);
+              } else {
+                console.log(
+                  'Pan detected, preserving existing markers and adding new ones',
+                );
+                // First, clear markers that are no longer in view
+                this.clearMarkers(false); // false = only clear out-of-bounds markers
+                return this.fetchLocationsFromOverpass(bounds);
+              }
+            },
+          ),
         )
-        .subscribe(
-          (bounds: {
-            north: number;
-            south: number;
-            east: number;
-            west: number;
-            isZoomChange: boolean;
-          }) => {
-            // If it's a zoom change, we need to refresh all markers
-            // If it's just a pan, we only need to fetch new locations
-            if (bounds.isZoomChange) {
-              console.log('Zoom change detected, refreshing all markers');
-              this.fetchLocationsFromOverpass(bounds).subscribe({
-                next: (locations: WeatherLocation[]) => {
-                  // Clear all existing markers and add new ones
-                  this.clearMarkers(true); // true = clear all markers
-                  this.addMarkersForLocations(
-                    locations,
-                    this.markerClickCallback,
-                  );
-                },
-                error: (error: Error) => {
-                  console.error('Error fetching locations:', error);
-                },
-              });
-            } else {
-              console.log(
-                'Pan detected, preserving existing markers and adding new ones',
-              );
-
-              // First, clear markers that are no longer in view
-              this.clearMarkers(false); // false = only clear out-of-bounds markers
-
-              this.fetchLocationsFromOverpass(bounds).subscribe({
-                next: (locations: WeatherLocation[]) => {
-                  console.log(
-                    `Found ${locations.length} new locations to add markers for`,
-                  );
-
-                  // Add markers only for new locations
-                  this.addMarkersForLocations(
-                    locations,
-                    this.markerClickCallback,
-                  );
-                },
-                error: (error: Error) => {
-                  console.error('Error fetching locations:', error);
-                },
-              });
-            }
+        .subscribe({
+          next: (locations: WeatherLocation[]) => {
+            console.log(
+              `Found ${locations.length} new locations to add markers for`,
+            );
+            // Add markers for the locations
+            this.addMarkersForLocations(locations, this.markerClickCallback);
           },
-        );
+          error: (error: Error) => {
+            console.error('Error fetching locations:', error);
+          },
+        });
     }
   }
 
@@ -539,13 +530,29 @@ export class MapService {
 
     // For each location, get weather data and create a marker
     locations.forEach((location: WeatherLocation) => {
+      // Check if a marker for this location already exists
+      if (this.markerLocationIds.has(location.id)) {
+        console.log(
+          `Marker for location ${location.name} (${location.id}) already exists, skipping`,
+        );
+        return;
+      }
+
       // Only add to displayedLocationIds after successfully creating the marker
       this.weatherService.getWeatherForLocation(location).subscribe({
         next: (weatherData: WeatherData | null) => {
           if (!weatherData) return;
 
           // Create a marker for this location
-          this.createWeatherMarker(weatherData, onMarkerClick);
+          const marker = this.createWeatherMarker(weatherData, onMarkerClick);
+
+          if (marker) {
+            // Add the location ID to the set of marker location IDs
+            this.markerLocationIds.add(location.id);
+
+            // Associate the marker with its location ID
+            this.markerToLocationId.set(marker, location.id);
+          }
         },
         error: (error: Error) => {
           console.error(`Error fetching weather for ${location.name}:`, error);
@@ -558,13 +565,13 @@ export class MapService {
    * Creates a weather marker for the given weather data
    * @param weatherData The weather data for the location
    * @param onMarkerClick Callback function to execute when the marker is clicked
-   * @returns boolean indicating if the marker was successfully created and added
+   * @returns The created marker, or null if creation failed
    */
   private createWeatherMarker(
     weatherData: WeatherData,
     onMarkerClick?: (weatherData: WeatherData) => void,
-  ): boolean {
-    if (!this.map || !this.L) return false;
+  ): L.Marker | null {
+    if (!this.map || !this.L) return null;
 
     try {
       // Create a custom icon based on the weather description
@@ -608,10 +615,10 @@ export class MapService {
       // Store the marker in our array for later reference
       this.markers.push(marker);
 
-      return true;
+      return marker;
     } catch (error) {
       console.error('Error creating weather marker:', error);
-      return false;
+      return null;
     }
   }
 
@@ -775,6 +782,10 @@ export class MapService {
     if (this.markerClusterGroup) {
       this.markerClusterGroup.clearLayers();
     }
+
+    // Clear the set of marker location IDs and the marker-to-location map
+    this.markerLocationIds.clear();
+    this.markerToLocationId.clear();
   }
 
   /**
@@ -819,6 +830,13 @@ export class MapService {
               const index = this.markers.indexOf(marker);
               if (index !== -1) {
                 this.markers.splice(index, 1);
+              }
+
+              // Remove the location ID from the set of marker location IDs
+              const locationId = this.markerToLocationId.get(marker);
+              if (locationId) {
+                this.markerLocationIds.delete(locationId);
+                this.markerToLocationId.delete(marker);
               }
 
               // Remove the marker from the map
@@ -973,9 +991,15 @@ export class MapService {
 
     return new Observable<WeatherLocation[]>((observer) => {
       // Construct the Overpass API query
+      const placeRegex =
+        this.currentZoomLevel > 11
+          ? '^(city|town|village|hamlet|suburb|island|islet|islet)$'
+          : this.currentZoomLevel > 8
+            ? '^(city|town)$'
+            : '^(city)$';
       const overpassQuery = `[out:json];
         (
-          node["place"~"^(city|town)$"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
+          node["place"~"${placeRegex}"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
         );
         out center;`;
 
@@ -1001,11 +1025,7 @@ export class MapService {
 
           // Process the results
           const allLocations: WeatherLocation[] = data.elements
-            .filter(
-              (element: OverpassElement) =>
-                element?.tags?.place &&
-                (this.currentZoomLevel > 8 || element.tags.place === 'city'),
-            )
+            .filter((element: OverpassElement) => element?.tags?.place)
             .map(
               (element: OverpassElement): WeatherLocation => ({
                 id: element.id.toString(),
