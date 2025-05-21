@@ -29,6 +29,8 @@ interface OverpassElement {
   id: number;
   tags?: {
     name?: string;
+    'name:es'?: string;
+    'name:en'?: string;
     place?: string;
     capital?: string;
   };
@@ -1030,6 +1032,8 @@ export class MapService {
               (element: OverpassElement): WeatherLocation => ({
                 id: element.id.toString(),
                 name: element.tags?.name || 'Unknown',
+                name_es: element.tags?.['name:es'],
+                name_en: element.tags?.['name:en'],
                 latitude:
                   element.lat || (element.center ? element.center.lat : 0),
                 longitude:

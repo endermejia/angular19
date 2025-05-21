@@ -13,6 +13,8 @@ import { Observable, catchError, map, of, tap } from 'rxjs';
 export interface WeatherLocation {
   id: string;
   name: string;
+  name_es?: string;
+  name_en?: string;
   latitude: number;
   longitude: number;
   capital: number;

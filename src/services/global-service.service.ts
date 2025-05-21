@@ -47,12 +47,16 @@ export class GlobalServiceService {
     picture: 'https://gabriel-mejia.com/assets/profile.webp',
   });
 
-  selectedLanguage: WritableSignal<string> = signal('es');
+  selectedLanguage: WritableSignal<'es' | 'en'> = signal('es');
   selectedTheme: WritableSignal<'light' | 'dark'> = signal('light');
 
   // Computed signal for Taiga UI language based on selectedLanguage
-  tuiLanguage: Signal<typeof TUI_SPANISH_LANGUAGE | typeof TUI_ENGLISH_LANGUAGE> = computed(() =>
-    this.selectedLanguage() === 'es' ? TUI_SPANISH_LANGUAGE : TUI_ENGLISH_LANGUAGE
+  tuiLanguage: Signal<
+    typeof TUI_SPANISH_LANGUAGE | typeof TUI_ENGLISH_LANGUAGE
+  > = computed(() =>
+    this.selectedLanguage() === 'es'
+      ? TUI_SPANISH_LANGUAGE
+      : TUI_ENGLISH_LANGUAGE,
   );
 
   drawer: WritableSignal<OptionsData> = signal({

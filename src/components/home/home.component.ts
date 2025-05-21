@@ -15,7 +15,7 @@ import { TuiBottomSheet } from '@taiga-ui/addon-mobile';
 import { TuiButton, TuiLoader, TuiTitle } from '@taiga-ui/core';
 import { TuiHeader } from '@taiga-ui/layout';
 import { TranslateService } from '@ngx-translate/core';
-import { MapService, WeatherData } from '../../services';
+import { GlobalServiceService, MapService, WeatherData } from '../../services';
 // Import types only, not the actual library
 import type * as L from 'leaflet';
 
@@ -48,6 +48,7 @@ export class HomeComponent implements AfterViewInit {
   protected locationDescription: WritableSignal<string> = signal('');
   protected mapUrl: WritableSignal<string> = signal('');
   protected websiteUrl: WritableSignal<string> = signal('');
+  protected weatherData: WritableSignal<WeatherData | null> = signal(null);
 
   // Signal to control the visibility of the bottom-sheet and buttons
   protected showBottomSheet: WritableSignal<boolean> = signal(false);
@@ -56,6 +57,7 @@ export class HomeComponent implements AfterViewInit {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly globalService = inject(GlobalServiceService);
   private readonly mapService = inject(MapService);
 
   ngAfterViewInit(): void {
@@ -179,9 +181,18 @@ export class HomeComponent implements AfterViewInit {
       weatherData,
     );
 
+    const locationName =
+      weatherData.location[`name_${this.globalService.selectedLanguage()}`] ??
+      weatherData.location.name;
+
+    console.log(locationName);
+
+    // Update the weatherData signal
+    this.weatherData.set(weatherData);
+
     // Update location info with weather data
     this.updateLocationInfo(
-      weatherData.location.name,
+      locationName,
       [
         {
           label: this.translate.instant('location.details.temperature'),

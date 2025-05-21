@@ -25,12 +25,14 @@ export class AppComponent {
 
   constructor() {
     const localStorageLang = this.localStorage.getItem('language');
-    if (localStorageLang) {
+    if (localStorageLang === 'es' || localStorageLang === 'en') {
       this.globalService.selectedLanguage.set(localStorageLang);
     }
     const localStorageTheme = this.localStorage.getItem('theme');
     if (localStorageTheme === 'dark' || localStorageTheme === 'light') {
-      this.globalService.selectedTheme.set(localStorageTheme as 'dark' | 'light');
+      this.globalService.selectedTheme.set(
+        localStorageTheme as 'dark' | 'light',
+      );
     }
   }
 }
